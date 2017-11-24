@@ -49,3 +49,11 @@
 #elif defined (__PX4_POSIX)
 # include <board_config.h>
 #endif
+
+/*
+ * Clobotics Predefines
+ * add define here to control some functions
+ * */
+#define CT_RC1ST 1
+#define CT_RC1ST_JOYSTICK_DEBUG CT_RC1ST&&1 //debug
+#define CT_PID_TUNING 1

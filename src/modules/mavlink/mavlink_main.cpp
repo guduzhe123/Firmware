@@ -2020,10 +2020,16 @@ Mavlink::task_main(int argc, char *argv[])
 
 	switch (_mode) {
 	case MAVLINK_MODE_NORMAL:
+#if CT_PID_TUNING
+		configure_stream("ATTITUDE", 10.0f);//10Hz
+		configure_stream("ATTITUDE_TARGET", 10.0f);//10Hz
+#else
+		configure_stream("ATTITUDE", 20.0f);
+		configure_stream("ATTITUDE_TARGET", 2.0f);//10Hz
+#endif
 		configure_stream("SYS_STATUS", 1.0f);
 		configure_stream("EXTENDED_SYS_STATE", 1.0f);
 		configure_stream("HIGHRES_IMU", 1.5f);
-		configure_stream("ATTITUDE", 20.0f);
 		configure_stream("RC_CHANNELS", 5.0f);
 		configure_stream("SERVO_OUTPUT_RAW_0", 1.0f);
 		configure_stream("ALTITUDE", 1.0f);
@@ -2039,7 +2045,6 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("LOCAL_POSITION_NED", 1.0f);
 		configure_stream("POSITION_TARGET_LOCAL_NED", 1.5f);
 		configure_stream("POSITION_TARGET_GLOBAL_INT", 1.5f);
-		configure_stream("ATTITUDE_TARGET", 2.0f);
 		configure_stream("HOME_POSITION", 0.5f);
 		configure_stream("NAMED_VALUE_FLOAT", 1.0f);
 		configure_stream("DEBUG", 1.0f);
@@ -2130,7 +2135,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("POSITION_TARGET_GLOBAL_INT", 10.0f);
 		configure_stream("SYSTEM_TIME", 1.0f);
 		configure_stream("TIMESYNC", 10.0f);
-		configure_stream("ATTITUDE_TARGET", 8.0f);
+		configure_stream("ATTITUDE_TARGET", 8.0f);//vehicle_attitude_setpoint vehicle_rates_setpoint
 		configure_stream("HOME_POSITION", 0.5f);
 		configure_stream("NAMED_VALUE_FLOAT", 50.0f);
 		configure_stream("DEBUG", 50.0f);
