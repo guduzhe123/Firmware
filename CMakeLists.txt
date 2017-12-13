@@ -188,7 +188,7 @@ message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 #=============================================================================
 # project definition
 #
-project(px4 CXX C ASM)
+project(px4_clobotics CXX C ASM)
 
 set(package-contact "px4users@googlegroups.com")
 

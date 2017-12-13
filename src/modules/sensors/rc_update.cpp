@@ -442,6 +442,7 @@ RCUpdate::rc_poll(const ParameterHandles &parameter_handles)
 					    _parameters.rc_man_th, _parameters.rc_man_inv);
 
 			/* publish manual_control_setpoint topic */
+			//PX4_INFO("orb_publish_auto %.2f", (double)manual.x);
 			orb_publish_auto(ORB_ID(manual_control_setpoint), &_manual_control_pub, &manual, &instance,
 					 ORB_PRIO_HIGH);
 

@@ -2976,6 +2976,8 @@ int commander_thread_main(int argc, char *argv[])
 					_last_sp_man_arm_switch == manual_control_setpoint_s::SWITCH_POS_ON &&
 					sp_man.arm_switch == manual_control_setpoint_s::SWITCH_POS_OFF;
 
+			 /* change from RC_IN_MODE_OFF to RC_IN_MODE_DEFAULT to use joystick instead of RC in Gazebo, can't arm using yaw+thr */
+            // == vehicle_status_s::RC_IN_MODE_DEFAULT
 			if (in_armed_state &&
 				status.rc_input_mode != vehicle_status_s::RC_IN_MODE_OFF &&
 				(status.is_rotary_wing || (!status.is_rotary_wing && land_detector.landed)) &&
@@ -3018,6 +3020,7 @@ int commander_thread_main(int argc, char *argv[])
 					_last_sp_man_arm_switch == manual_control_setpoint_s::SWITCH_POS_OFF &&
 					sp_man.arm_switch == manual_control_setpoint_s::SWITCH_POS_ON;
 
+			// change from RC_IN_MODE_OFF to RC_IN_MODE_DEFAULT to use joystick instead of RC in Gazebo, can't arm using yaw+thr
 			if (!in_armed_state &&
 				status.rc_input_mode != vehicle_status_s::RC_IN_MODE_OFF &&
 				(stick_in_lower_right || arm_button_pressed || arm_switch_to_arm_transition) ) {
@@ -3111,6 +3114,9 @@ int commander_thread_main(int argc, char *argv[])
 			/* no else case: do not change lockdown flag in unconfigured case */
 		} else {
 			if (!status_flags.rc_input_blocked && !status.rc_signal_lost) {
+				// watch what cause MANUAL CONTROL LOST
+				//PX4_INFO("ACCELSIM::measure %" PRIu64, hrt_absolute_time());
+				mavlink_log_critical(&mavlink_log_pub, "now: %" PRIu64 ", sp_man_time: %" PRIu64 "", hrt_absolute_time(), sp_man.timestamp);
 				mavlink_log_critical(&mavlink_log_pub, "MANUAL CONTROL LOST (at t=%llums)", hrt_absolute_time() / 1000);
 				status.rc_signal_lost = true;
 				rc_signal_lost_timestamp = sp_man.timestamp;
