@@ -123,6 +123,8 @@
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/estimator_status.h>
 
+#include "../systemcmds/mixer/mixer.h"
+
 typedef enum VEHICLE_MODE_FLAG
 {
 	VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED=1, /* 0b00000001 Reserved for future use. | */
@@ -194,6 +196,11 @@ static hrt_abstime commander_boot_timestamp = 0;
 // ccc takeover flag
 static int32_t ccc_backdoor = 0;
 static bool ccc_takeover_enable = false;
+
+/*motor stop params*/
+int32_t mixer_switch = 0;//NOTICE!!! use this may cause stack overload!!!
+const char *mixer_devname = "/dev/pwm_output0";
+const char *mixer_fname_1 = "ROMFS/px4fmu_common/mixers/quad_h.main.mix";
 
 static unsigned int leds_counter;
 /* To remember when last notification was sent */
@@ -686,6 +693,11 @@ int commander_main(int argc, char *argv[])
 
 		return 0;
 	}
+
+	/*if (!strcmp(argv[1], "test_mixer")) {
+        mixer_switch("/dev/pwm_output0", "ROMFS/px4fmu_common/mixers/quad_h.main.mix");
+		return 0;
+	}*/
 
 	usage("unrecognized command");
 	return 1;
@@ -1310,6 +1322,9 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
                 mavlink_log_critical(&mavlink_log_pub, "Stop M%d and M%d", (int)cmd->param2, motor_stop_num_oppo);
             }else{
                 mavlink_log_critical(&mavlink_log_pub, "Stop M%d", motor_stop_num);
+				if(mixer_switch){
+					do_mixer_switch(mixer_devname, mixer_fname_1);
+				}
             }
 		}else{
 			motor_stop_num = 0;
@@ -1493,6 +1508,7 @@ int commander_thread_main(int argc, char *argv[])
 	param_t _param_disarm_land = param_find("COM_DISARM_LAND");
 	param_t _param_motor_stop_num = param_find("MOTOR_STOP_NUM");
 	param_t _param_motor_stop_enable = param_find("MOTOR_STOP_EN");
+	param_t _param_mixer_switch = param_find("MIXER_SWITCH");
 	param_t _param_low_bat_act = param_find("COM_LOW_BAT_ACT");
 	param_t _param_offboard_loss_timeout = param_find("COM_OF_LOSS_T");
 	param_t _param_arm_without_gps = param_find("COM_ARM_WO_GPS");
@@ -2051,6 +2067,7 @@ int commander_thread_main(int argc, char *argv[])
             int32_t motor_stop_num_oppo = 0;
 			param_get(_param_motor_stop_num, &motor_stop_num_param);
 			param_get(_param_motor_stop_enable, &motor_stop_enable);
+			param_get(_param_mixer_switch, &mixer_switch);
 			int motor_stop_enable_int = (int)motor_stop_enable;
             static int motor_stop_enable_int_prev = 0;
 
@@ -2070,6 +2087,10 @@ int commander_thread_main(int argc, char *argv[])
                 }else{
                     motor_stop_num = motor_stop_num_param;
                     mavlink_log_critical(&mavlink_log_pub, "Stop M%d", motor_stop_num);
+					if(mixer_switch){
+						//mixer_switch("/dev/pwm_output0", "ROMFS/px4fmu_common/mixers/quad_h.main.mix");
+						do_mixer_switch(mixer_devname, mixer_fname_1);
+					}
                 }
 				//only deal with changed param
                 status.motor_stop_num = motor_stop_num;

@@ -51,6 +51,8 @@
 #include <lib/mixer/mixer.h>
 #include <uORB/topics/actuator_controls.h>
 
+#include "mixer.h"
+
 /**
  * Mixer utility for loading mixer files to devices
  *
@@ -60,6 +62,16 @@ extern "C" __EXPORT int mixer_main(int argc, char *argv[]);
 
 static void	usage(const char *reason);
 static int	load(const char *devname, const char *fname, bool append);
+
+int
+do_mixer_switch(const char *devname, const char *fname)
+{
+	//load("/dev/pwm_output0", "ROMFS/px4fmu_common/mixers/quad_h.main.mix", false);
+	//do_mixer_switch("/dev/pwm_output0", "ROMFS/px4fmu_common/mixers/quad_h.main.mix");
+	load(devname, fname, false);
+	PX4_INFO(">>>>>>>>>>mixer switch<<<<<<<<<<<");
+	return 0;
+}
 
 int
 mixer_main(int argc, char *argv[])
@@ -88,6 +100,7 @@ mixer_main(int argc, char *argv[])
 			return 1;
 		}
 
+		//todo use this to load mixer while flying
 		int ret = load(argv[2], argv[3], true);
 
 		if (ret != 0) {

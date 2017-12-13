@@ -45,6 +45,7 @@
 
 #include "mixer_load.h"
 
+//load
 int load_mixer_file(const char *fname, char *buf, unsigned maxlen)
 {
 	FILE		*fp;

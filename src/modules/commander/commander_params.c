@@ -722,6 +722,15 @@ PARAM_DEFINE_FLOAT(MOTOR_STOP_EN, 0.0f);
  */
 PARAM_DEFINE_INT32(MOTOR_STOP_NUM, 3);
 
+/**
+ * Motor Stop Mixer Switch
+ *
+ * @min 0
+ * @max 1
+ * @group Commander
+ */
+PARAM_DEFINE_INT32(MIXER_SWITCH, 0);
+
  * Next flight UUID
  *
  * This number is incremented automatically after every flight on

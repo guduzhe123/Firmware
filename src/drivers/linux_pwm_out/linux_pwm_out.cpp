@@ -138,6 +138,7 @@ int initialize_mixer(const char *mixer_filename)
 
 	// PX4_INFO("Trying to initialize mixer from config file %s", mixer_filename);
 
+	//mixer load
 	if (load_mixer_file(mixer_filename, buf, buflen) == 0) {
 		if (_mixer_group->load_from_buf(buf, buflen) == 0) {
 			PX4_INFO("Loaded mixer from file %s", mixer_filename);
@@ -197,6 +198,8 @@ void task_main(int argc, char *argv[])
 	_is_running = true;
 
 	// Set up mixer
+	//load_mixer_file
+	//linux_pwm_out start -m ROMFS/px4fmu_common/mixers/AETRFG.main.mix
 	if (initialize_mixer(_mixer_filename) < 0) {
 		PX4_ERR("Mixer initialization failed.");
 		return;
