@@ -282,6 +282,7 @@ void usage(const char *reason);
 
 /**
  * React to commands that are sent e.g. from the mavlink module.
+ * modify handle_command for landing gear
  */
 bool handle_command(struct vehicle_status_s *status, const struct safety_s *safety, struct vehicle_command_s *cmd,
 		    struct actuator_armed_s *armed, struct home_position_s *home, struct vehicle_global_position_s *global_pos,
@@ -659,6 +660,32 @@ int commander_main(int argc, char *argv[])
 
 		return 0;
 	}
+	if (!strcmp(argv[1], "landing_gear")) {
+
+		if (argc < 3) {
+			usage("not enough arguments, missing [up, down]");
+			return 1;
+		}
+
+		struct vehicle_command_s _cmd = {
+		.timestamp = 0,
+		.param5 = 0,
+		.param6 = 0,
+		.param1 = 0,
+		/* if the comparison matches for up (== 0) set 1.0f, 2.0f (on) else */
+		.param2 = strcmp(argv[2], "up") ? 0.0f : 1.0f, // 0 for down, 1 for up
+		.param3 = 1, //command from GCS or RC, GCS: 1, RC: 0
+		.param4 = 0,
+		.param7 = 0,
+		.command = vehicle_command_s::VEHICLE_CMD_AIRFRAME_CONFIGURATION,
+		.target_system = 0
+		};
+
+		orb_advert_t h = orb_advertise_queue(ORB_ID(vehicle_command), &_cmd, vehicle_command_s::ORB_QUEUE_LENGTH);
+		(void)orb_unadvertise(h);
+
+		return 0;
+	}
 
 	usage("unrecognized command");
 	return 1;
@@ -670,7 +697,7 @@ void usage(const char *reason)
 		PX4_INFO("%s", reason);
 	}
 
-	PX4_INFO("usage: commander {start|stop|status|calibrate|check|arm|disarm|takeoff|land|transition|mode}\n");
+	PX4_INFO("usage: commander {start|stop|status|calibrate|check|arm|disarm|takeoff|land|transition|mode|landing_gear}\n");
 }
 
 void print_status()
@@ -774,6 +801,9 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 	/* only handle commands that are meant to be handled by this system and component */
 	if (cmd->target_system != status_local->system_id || ((cmd->target_component != status_local->component_id)
 			&& (cmd->target_component != 0))) { // component_id 0: valid for all components
+		//PX4_INFO("target_system:%d, system_id:%d, target_component:%d, component_id:%d",
+				 //cmd->target_system, status_local->system_id, cmd->target_component, status_local->component_id);
+		//Notice landing gear target
 		return false;
 	}
 
@@ -1211,6 +1241,31 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 		}
 		break;
 
+	case vehicle_command_s::VEHICLE_CMD_AIRFRAME_CONFIGURATION: {
+
+		//PX4_INFO("VEHICLE_CMD_AIRFRAME_CONFIGURATION");
+		bool landing_gear_cmd = (int)cmd->param2 == 1;//-1 for down
+        if(landing_gear_cmd != status.landing_gear_state){
+            status.landing_gear_state = landing_gear_cmd;
+            if(landing_gear_cmd){
+                mavlink_log_critical(&mavlink_log_pub, "Landing gear up");
+            }else{
+                mavlink_log_critical(&mavlink_log_pub, "Landing gear down");
+            }
+        }else{
+            if(landing_gear_cmd){
+                mavlink_log_info(&mavlink_log_pub, "Landing gear already up");
+            }else{
+                mavlink_log_info(&mavlink_log_pub, "Landing gear already down");
+            }
+			cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+            break;
+        }
+
+		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+	}
+		break;
+
 	case vehicle_command_s::VEHICLE_CMD_MISSION_START: {
 
 		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_DENIED;
@@ -1537,6 +1592,7 @@ int commander_thread_main(int argc, char *argv[])
 	main_state_prev = commander_state_s::MAIN_STATE_MAX;
 	status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 	status.arming_state = vehicle_status_s::ARMING_STATE_INIT;
+    status.landing_gear_state = false;//down on startup
 
 	status.failsafe = false;
 

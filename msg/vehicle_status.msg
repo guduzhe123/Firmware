@@ -46,6 +46,7 @@ uint8 nav_state				# set navigation state machine to specified value
 uint8 arming_state			# current arming state
 uint8 hil_state				# current hil state
 bool failsafe				# true if system is in failsafe state
+bool landing_gear_state     # landing gear up: true, down:false
 
 uint8 system_type			# system type, contains mavlink MAV_TYPE
 uint8 system_id			# system id, contains MAVLink's system ID field

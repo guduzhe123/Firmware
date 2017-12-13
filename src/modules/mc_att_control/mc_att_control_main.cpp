@@ -1240,6 +1240,7 @@ MulticopterAttitudeControl::task_main()
 				_actuators.timestamp = hrt_absolute_time();
 				_actuators.timestamp_sample = _sensor_gyro.timestamp;
 
+				// PX4_INFO("_actuators.control[7] = %.2f", (double)_actuators.control[7]);
 				/* scale effort by battery status */
 				if (_params.bat_scale_en && _battery_status.scale > 0.0f) {
 					for (int i = 0; i < 4; i++) {

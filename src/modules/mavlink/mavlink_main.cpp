@@ -2014,7 +2014,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("STATUSTEXT", 20.0f);
 
 		/* COMMAND_LONG stream: use unlimited rate to send all commands */
-		configure_stream("COMMAND_LONG");
+		configure_stream("COMMAND_LONG");//already forward here!!!
 
 	}
 

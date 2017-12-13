@@ -563,7 +563,7 @@ void MavlinkReceiver::handle_message_command_both(mavlink_message_t *msg, const 
 				_cmd_pub = orb_advertise_queue(ORB_ID(vehicle_command), &vehicle_command, vehicle_command_s::ORB_QUEUE_LENGTH);
 
 			} else {
-				orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vehicle_command);
+				orb_publish(ORB_ID(vehicle_command), _cmd_pub, &vehicle_command);//already publish cmd here
 			}
 		}
 	}
@@ -1568,7 +1568,7 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 		return;
 	}
 
-	// sim RC input from manual_control but not channels_override
+	/* sim RC input from manual_control but not channels_override */
 	if (_mavlink->get_manual_input_mode_generation()) {
 
 		struct rc_input_values rc = {};

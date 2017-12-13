@@ -68,6 +68,7 @@
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/vehicle_command.h>
 
 #include <float.h>
 #include <lib/geo/geo.h>
@@ -116,6 +117,9 @@ private:
 
 	bool		_task_should_exit = false;			/**<true if task should exit */
 	bool		_gear_state_initialized = false;		/**<true if the gear state has been initialized */
+	int			_manual_gear_switch_last = manual_control_setpoint_s::SWITCH_POS_NONE;
+	bool 		_landing_gear_up_cmd_sent = false;
+	bool 		_landing_gear_dn_cmd_sent = false;
 	bool 		_reset_pos_sp = true;  				/**<true if position setpoint needs a reset */
 	bool 		_reset_alt_sp = true; 				/**<true if altitude setpoint needs a reset */
 	bool 		_do_reset_alt_pos_flag = true; 		/**< TODO: check if we need this */
@@ -150,6 +154,7 @@ private:
 
 	orb_advert_t	_att_sp_pub;			/**< attitude setpoint publication */
 	orb_advert_t	_local_pos_sp_pub;		/**< vehicle local position setpoint publication */
+	orb_advert_t    _vehicle_command_pub;       /**< vehicle command*/
 
 	orb_id_t _attitude_setpoint_id;
 
@@ -164,6 +169,7 @@ private:
 	struct position_setpoint_triplet_s		_pos_sp_triplet;	/**< vehicle global position setpoint triplet */
 	struct vehicle_local_position_setpoint_s	_local_pos_sp;		/**< vehicle local position setpoint */
 	struct home_position_s				_home_pos; 				/**< home position */
+	struct vehicle_command_s 			_vcmd;                   /**< landing gear command*/
 
 	control::BlockParamFloat _manual_thr_min; /**< minimal throttle output when flying in manual mode */
 	control::BlockParamFloat _manual_thr_max; /**< maximal throttle output when flying in manual mode */
@@ -386,6 +392,8 @@ private:
 
 	bool in_auto_takeoff();
 
+	void send_landing_gear_vcmd(int up_or_down);
+
 	float get_vel_close(const matrix::Vector2f &unit_prev_to_current, const matrix::Vector2f &unit_current_to_next);
 
 	void set_manual_acceleration_xy(matrix::Vector2f &stick_input_xy_NED, const float dt);
@@ -436,6 +444,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	/* publications */
 	_att_sp_pub(nullptr),
 	_local_pos_sp_pub(nullptr),
+	_vehicle_command_pub(nullptr),
 	_attitude_setpoint_id(nullptr),
 	_vehicle_status{},
 	_vehicle_land_detected{},
@@ -448,6 +457,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_pos_sp_triplet{},
 	_local_pos_sp{},
 	_home_pos{},
+	_vcmd{},
 	_manual_thr_min(this, "MANTHR_MIN"),
 	_manual_thr_max(this, "MANTHR_MAX"),
 	_xy_vel_man_expo(this, "XY_MAN_EXPO"),
@@ -753,6 +763,9 @@ MulticopterPositionControl::poll_subscriptions()
 				_attitude_setpoint_id = ORB_ID(vehicle_attitude_setpoint);
 			}
 		}
+
+		/* TODO send cmd from GCS > commnader > att_sp > SITL  */
+		//if(_vehicle_status.landing_gear_state != _landing_gear_state_last){}
 	}
 
 	orb_check(_vehicle_land_detected_sub, &updated);
@@ -986,6 +999,42 @@ MulticopterPositionControl::in_auto_takeoff()
 		_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF) ||
 	       _control_mode.flag_control_offboard_enabled;
 }
+
+void
+MulticopterPositionControl::send_landing_gear_vcmd(int up_or_down)
+{
+	// send cmd directly whether if landing gear already in thast state, notify this in commmander.
+	// LANDING_GEAR_DOWN = -1(status.landing_gear_state == 0), LANDING_GEAR_UP = 1
+	bool up_or_down_bool = up_or_down == 1;
+
+	if (_vehicle_status.landing_gear_state == up_or_down_bool) {
+		PX4_INFO("landing gear already in this state, skip.");
+		return;
+	}
+
+	_vcmd = {
+		.timestamp = 0,
+		.param5 = 0,
+		.param6 = 0,
+		.param1 = 0,    //	Landing gear ID (default: 0, -1 for all)
+		.param2 = (float)up_or_down_bool,    //  Landing gear position (Down: 0, Up: 1, NAN for no change)
+		.param3 = 0,	//  command from GCS or RC, GCS: 1, RC: 0
+		.param4 = 0,
+		.param7 = 0,
+		.command = vehicle_command_s::VEHICLE_CMD_AIRFRAME_CONFIGURATION, // Command ID, as defined by vehicle_command.msg enum.
+		.target_system = _vehicle_status.system_id,
+		.target_component = _vehicle_status.component_id
+	};
+
+	if (_vehicle_command_pub == nullptr) {
+		_vehicle_command_pub = orb_advertise(ORB_ID(vehicle_command), &_vcmd);
+
+	} else {
+		orb_publish(ORB_ID(vehicle_command), _vehicle_command_pub, &_vcmd);
+		PX4_INFO("pub send_landing_gear_vcmd");
+	}
+}
+
 
 float
 MulticopterPositionControl::get_vel_close(const matrix::Vector2f &unit_prev_to_current,
@@ -2381,6 +2430,7 @@ void MulticopterPositionControl::control_auto(float dt)
 		const bool high_enough_for_landing_gear = (-_pos(2) + _home_pos.z > 2.0f);
 
 		// During a mission or in loiter it's safe to retract the landing gear.
+		/* landing gear in AUTO mode*/
 		if ((_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION ||
 		     _pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) &&
 		    !_vehicle_land_detected.landed &&
@@ -2388,12 +2438,28 @@ void MulticopterPositionControl::control_auto(float dt)
 
 			_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_UP;
 
+			if (!_landing_gear_up_cmd_sent) {
+				PX4_INFO("LANDING_GEAR_UP in AUTO");
+				send_landing_gear_vcmd(vehicle_attitude_setpoint_s::LANDING_GEAR_UP);
+				_landing_gear_up_cmd_sent = true;
+			}
+
+			_landing_gear_dn_cmd_sent = false;
+
 		} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF ||
 			   _pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND ||
 			   !high_enough_for_landing_gear) {
 
 			// During takeoff and landing, we better put it down again.
 			_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN;
+
+			if (!_landing_gear_dn_cmd_sent) {
+				PX4_INFO("LANDING_GEAR_DOWN in AUTO");
+				send_landing_gear_vcmd(vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN);
+				_landing_gear_dn_cmd_sent = true;
+			}
+
+			_landing_gear_up_cmd_sent = false;
 
 			// For the rest of the setpoint types, just leave it as is.
 		}
@@ -3060,14 +3126,30 @@ MulticopterPositionControl::generate_attitude_setpoint(float dt)
 	// the user switched from gear down to gear up.
 	// If the user had the switch in the gear up position and took off ignore it
 	// until he toggles the switch to avoid retracting the gear immediately on takeoff.
+	/* landing gear in MANUAL mode*/
 	if (_manual.gear_switch == manual_control_setpoint_s::SWITCH_POS_ON && _gear_state_initialized &&
 	    !_vehicle_land_detected.landed) {
 		_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_UP;
 
+		//only send when the switch changed, send UP_CMD even if the landing gear is already up
+		if (_manual_gear_switch_last != _manual.gear_switch) {
+			PX4_INFO("LANDING_GEAR_UP in MANUAL");
+			send_landing_gear_vcmd(vehicle_attitude_setpoint_s::LANDING_GEAR_UP);
+			_manual_gear_switch_last = _manual.gear_switch;
+		}
+
 	} else if (_manual.gear_switch == manual_control_setpoint_s::SWITCH_POS_OFF) {
 		_att_sp.landing_gear = vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN;
+
+		if (_manual_gear_switch_last != _manual.gear_switch) {
+			PX4_INFO("LANDING_GEAR_DOWN in MANUAL");
+			send_landing_gear_vcmd(vehicle_attitude_setpoint_s::LANDING_GEAR_DOWN);
+			_manual_gear_switch_last = _manual.gear_switch;
+		}
+
 		// Switching the gear off does put it into a safe defined state
 		_gear_state_initialized = true;
+		//_vehicle_land_detected.landed = false;    // TODO cheat the program the plane is flying
 	}
 
 	_att_sp.timestamp = hrt_absolute_time();
@@ -3287,6 +3369,7 @@ MulticopterPositionControl::task_main()
 			 _control_mode.flag_control_velocity_enabled ||
 			 _control_mode.flag_control_acceleration_enabled)))) {
 
+			// only pub here
 			if (_att_sp_pub != nullptr) {
 				orb_publish(_attitude_setpoint_id, _att_sp_pub, &_att_sp);
 

@@ -466,9 +466,14 @@ protected:
 
 		if (_cmd_sub->update_if_changed(&cmd)) {
 
+			//bool from_external;
 			if (!cmd.from_external) {
 				if (_mavlink->verbose()) {
 					PX4_INFO("sending command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
+				}
+
+				if (cmd.command == vehicle_command_s::VEHICLE_CMD_AIRFRAME_CONFIGURATION) {
+					PX4_INFO("Landing gear: sending command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
 				}
 
 				MavlinkCommandSender::instance().handle_vehicle_command(cmd, _mavlink->get_channel());
@@ -477,6 +482,13 @@ protected:
 			} else {
 				if (_mavlink->verbose()) {
 					PX4_INFO("not forwarding command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
+				}
+
+				// exception for Landing gear from GCS
+				if (cmd.command == vehicle_command_s::VEHICLE_CMD_AIRFRAME_CONFIGURATION) {
+					PX4_INFO("Landing gear: sending command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
+					MavlinkCommandSender::instance().handle_vehicle_command(cmd, _mavlink->get_channel());
+					sent = true;
 				}
 			}
 		}

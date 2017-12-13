@@ -71,6 +71,7 @@ uint16 VEHICLE_CMD_CCC_YIELD = 31011	# MAV_CMD_CCC_YIELD
 uint16 VEHICLE_CMD_PREFLIGHT_UAVCAN = 243		# UAVCAN configuration. If param 1 == 1 actuator mapping and direction assignment should be started
 uint16 VEHICLE_CMD_LOGGING_START = 2510		# start streaming ULog data
 uint16 VEHICLE_CMD_LOGGING_STOP = 2511			# stop streaming ULog data
+uint32 VEHICLE_CMD_AIRFRAME_CONFIGURATION = 2520    # landing gear control, see http://mavlink.org/messages/common
 
 uint8 VEHICLE_CMD_RESULT_ACCEPTED = 0			# Command ACCEPTED and EXECUTED |
 uint8 VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED = 1	# Command TEMPORARY REJECTED/DENIED |

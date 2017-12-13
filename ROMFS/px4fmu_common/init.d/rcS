@@ -420,6 +420,7 @@ then
 		sh /etc/init.d/rc.sensors
 		commander start
 	fi
+	commander landing_gear down
 
 	send_event start
 	load_mon start
