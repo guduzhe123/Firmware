@@ -79,6 +79,7 @@
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_outputs.h>
+#include <uORB/topics/vehicle_status.h>
 
 #include <systemlib/err.h>
 
@@ -117,6 +118,7 @@ private:
 	px4_pollfd_struct_t	_poll_fds[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
 	unsigned	_poll_fds_num;
 	int		_armed_sub;
+	int     _vstatus_sub;
 	orb_advert_t	_outputs_pub;
 	unsigned	_num_outputs;
 	bool		_primary_pwm_device;
@@ -182,6 +184,7 @@ PWMSim::PWMSim() :
 	_poll_fds{},
 	_poll_fds_num(0),
 	_armed_sub(-1),
+	_vstatus_sub(-1),
 	_outputs_pub(nullptr),
 	_num_outputs(0),
 	_primary_pwm_device(false),
@@ -372,6 +375,7 @@ PWMSim::task_main()
 	_current_update_rate = 0;
 
 	_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
+	_vstatus_sub = orb_subscribe(ORB_ID(vehicle_status));
 
 	/* advertise the mixed control outputs */
 	actuator_outputs_s outputs = {};
@@ -480,7 +484,7 @@ PWMSim::task_main()
 			/* disable unused ports by setting their output to NaN */
 			for (size_t i = 0; i < sizeof(outputs.output) / sizeof(outputs.output[0]); i++) {
 				if (i >= num_outputs) {
-					outputs.output[i] = NAN;
+					outputs.output[i] = NAN;//use NAN not 0
 				}
 			}
 
@@ -500,14 +504,60 @@ PWMSim::task_main()
 					 * This will be clearly visible on the servo status and will limit the risk of accidentally
 					 * spinning motors. It would be deadly in flight.
 					 */
+					//900 use this to disable motor
 					outputs.output[i] = PWM_SIM_DISARMED_MAGIC;
 				}
 			}
 
+
+#if CT_DISABLE_MOTOR
+			/*
+			 * QGroundControl Custom Command to disable motor
+			 * QGCButton {
+			 *      text: "VEHICLE_CMD_CT_MOTOR_STOP NO.3"
+			 *      // Arguments to CustomCommandWidgetController::sendCommand (Mavlink COMMAND_LONG)
+			 *      //   command id
+			 *      //   component id
+			 *      //   confirmadtion
+			 *      //   param 1-7
+			 *      onClicked: controller.sendCommand(701, 0, 0, 1, 3, 0, 0, 0, 0, 0)
+			 * }
+			 * QGCButton {
+			 *      text: "VEHICLE_CMD_CT_MOTOR_STOP NO.3&4"
+			 *      onClicked: controller.sendCommand(701, 0, 0, 1, 3, 1, 0, 0, 0, 0)
+			 * }
+			 */
+
+			bool ct_updated;
+			int motor_stop_num = 0;
+			int motor_stop_num_oppo = 0;
+
+			orb_check(_vstatus_sub, &ct_updated);
+			static vehicle_status_s vehicle_status;
+
+			if (ct_updated) {
+				orb_copy(ORB_ID(vehicle_status), _vstatus_sub, &vehicle_status);
+			}
+
+			motor_stop_num = vehicle_status.motor_stop_num;
+
+			if (motor_stop_num > 10) {
+				motor_stop_num_oppo = motor_stop_num / 10 - 1;
+				motor_stop_num = motor_stop_num % 10 - 1;
+				outputs.output[motor_stop_num_oppo] =  PWM_SIM_DISARMED_MAGIC;
+				outputs.output[motor_stop_num] =  PWM_SIM_DISARMED_MAGIC;
+
+			} else if (motor_stop_num > 0) {
+				outputs.output[motor_stop_num - 1] =  PWM_SIM_DISARMED_MAGIC;
+			}
+
+#endif
+
+
 			/* overwrite outputs in case of force_failsafe */
 			if (_failsafe) {
 				for (size_t i = 0; i < num_outputs; i++) {
-					outputs.output[i] = PWM_SIM_FAILSAFE_MAGIC;
+					outputs.output[i] = PWM_SIM_FAILSAFE_MAGIC;//600
 				}
 			}
 
@@ -543,6 +593,7 @@ PWMSim::task_main()
 	}
 
 	orb_unsubscribe(_armed_sub);
+	orb_unsubscribe(_vstatus_sub);
 
 	/* make sure servos are off */
 	// up_pwm_servo_deinit();

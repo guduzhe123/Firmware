@@ -298,6 +298,20 @@ mixer_tick(void)
 		pwm_limit_calc(should_arm, should_arm_nothrottle, mixed, r_setup_pwm_reverse, r_page_servo_disarmed,
 			       r_page_servo_control_min, r_page_servo_control_max, outputs, r_page_servos, &pwm_limit);
 
+		//r_page_servos[1] = 900;//this works
+		uint8_t motor_stop_num = r_setup_motor_stop;//PX4IO_P_SETUP_MOTOR_STOP 34>>3&4(1-6) >> 2&3(start from 0-5)
+
+		if (motor_stop_num > 10) {
+			uint8_t motor_stop_num_oppo = motor_stop_num / 10 - 1;//the unit
+			motor_stop_num = motor_stop_num % 10 - 1;//the decade
+			r_page_servos[motor_stop_num] =  900;
+			r_page_servos[motor_stop_num_oppo] =  900;
+
+		} else if (motor_stop_num > 0) {
+			motor_stop_num -= 1;
+			r_page_servos[motor_stop_num] = 900;
+		}//else: nothing to do
+
 		/* clamp unused outputs to zero */
 		for (unsigned i = mixed; i < PX4IO_SERVO_COUNT; i++) {
 			r_page_servos[i] = 0;

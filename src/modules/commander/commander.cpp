@@ -1236,6 +1236,38 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 		}
 	}
 	break;
+
+	case vehicle_command_s::VEHICLE_CMD_CT_MOTOR_STOP: {
+
+		int motor_stop_enable =  (int)cmd->param1;
+		int motor_stop_num = (int)cmd->param2;
+		int motor_stop_pair = (int)cmd->param3;//0/1 all mean only 1, 2 means a pair
+
+		if(motor_stop_enable){
+			if(motor_stop_pair >= 1){
+				int motor_stop_num_oppo;
+				if(motor_stop_num % 2 == 1){
+					motor_stop_num_oppo = motor_stop_num + 1;
+				}else{
+					motor_stop_num_oppo = motor_stop_num - 1;
+				}
+				motor_stop_num = motor_stop_num + motor_stop_num_oppo * 10;
+                mavlink_log_critical(&mavlink_log_pub, "Stop M%d and M%d", (int)cmd->param2, motor_stop_num_oppo);
+            }else{
+                mavlink_log_critical(&mavlink_log_pub, "Stop M%d", motor_stop_num);
+            }
+		}else{
+			motor_stop_num = 0;
+			mavlink_log_critical(&mavlink_log_pub, "Restart Motor");
+		}
+
+        status.motor_stop_num = (uint32_t)motor_stop_num;
+
+		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+
+		break;
+	}
+
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_0:
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_1:
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_2:
@@ -1404,6 +1436,8 @@ int commander_thread_main(int argc, char *argv[])
 	param_t _param_epv = param_find("COM_HOME_V_T");
 	param_t _param_geofence_action = param_find("GF_ACTION");
 	param_t _param_disarm_land = param_find("COM_DISARM_LAND");
+	param_t _param_motor_stop_num = param_find("MOTOR_STOP_NUM");
+	param_t _param_motor_stop_enable = param_find("MOTOR_STOP_EN");
 	param_t _param_low_bat_act = param_find("COM_LOW_BAT_ACT");
 	param_t _param_offboard_loss_timeout = param_find("COM_OF_LOSS_T");
 	param_t _param_arm_without_gps = param_find("COM_ARM_WO_GPS");
@@ -1953,6 +1987,41 @@ int commander_thread_main(int argc, char *argv[])
 			param_get(_param_geofence_action, &geofence_action);
 			param_get(_param_disarm_land, &disarm_when_landed);
 			param_get(_param_flight_uuid, &flight_uuid);
+
+			//motor stop param
+            float motor_stop_enable = 0.0f;
+            int32_t motor_stop_num_param = 0;
+            int32_t motor_stop_num = 0;
+            int32_t motor_stop_num_oppo = 0;
+			param_get(_param_motor_stop_num, &motor_stop_num_param);
+			param_get(_param_motor_stop_enable, &motor_stop_enable);
+			int motor_stop_enable_int = (int)motor_stop_enable;
+            static int motor_stop_enable_int_prev = 0;
+
+            if(motor_stop_enable_int != motor_stop_enable_int_prev){
+                motor_stop_enable_int_prev = motor_stop_enable_int;
+                if(motor_stop_enable_int >= 2){
+                    if(motor_stop_num_param % 2 == 1){
+                        motor_stop_num_oppo = motor_stop_num_param + 1;
+                    }else{
+                        motor_stop_num_oppo = motor_stop_num_param - 1;
+                    }
+                    motor_stop_num = motor_stop_num_oppo * 10 + motor_stop_num_param;//3&4 >> 34
+                    mavlink_log_critical(&mavlink_log_pub, "Stop M%d & M%d", motor_stop_num_oppo, motor_stop_num_param);
+                }else if(motor_stop_enable_int <= 0){
+                    motor_stop_num = 0;
+                    mavlink_log_critical(&mavlink_log_pub, "Restart Motor");
+                }else{
+                    motor_stop_num = motor_stop_num_param;
+                    mavlink_log_critical(&mavlink_log_pub, "Stop M%d", motor_stop_num);
+                }
+				//only deal with changed param
+                status.motor_stop_num = motor_stop_num;
+
+                //add motor_stop_num
+				//publish it immediately
+				status_changed = true;
+            }
 
 			// If we update parameters the first time
 			// make sure the hysteresis time gets set.
@@ -3379,6 +3448,8 @@ int commander_thread_main(int argc, char *argv[])
 		if (!armed.armed) {
 			/* Reset the flag if disarmed. */
 			have_taken_off_since_arming = false;
+            /*set motor_stop_num to 0 when disarmed*/
+            status.motor_stop_num = 0;
 		}
 
 		/* publish vehicle_status_flags */

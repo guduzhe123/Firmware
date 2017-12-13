@@ -58,3 +58,4 @@
 
 #define CCC_TAKEOVER 1
 #define CCC_YIELD 0
+#define CT_DISABLE_MOTOR 1

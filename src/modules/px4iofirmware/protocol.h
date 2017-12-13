@@ -133,6 +133,7 @@
 
 #define PX4IO_P_STATUS_MIXER			9	 /* mixer actuator limit flags */
 
+//post mix actuator
 /* array of post-mix actuator outputs, -10000..10000 */
 #define PX4IO_PAGE_ACTUATORS		2		/* 0..CONFIG_ACTUATOR_COUNT-1 */
 
@@ -236,6 +237,9 @@ enum {							/* DSM bind states */
 #define PX4IO_THERMAL_IGNORE			UINT16_MAX
 #define PX4IO_THERMAL_OFF			0
 #define PX4IO_THERMAL_FULL			10000
+
+//todo it's better to use NETMASK: 0XFFFF 00000010
+#define PX4IO_P_SETUP_MOTOR_STOP 		27	/* stop specified motor, follow  PX4IO_P_SETUP_THR_MDL_FAC*/
 
 /* autopilot control values, -10000..10000 */
 #define PX4IO_PAGE_CONTROLS			51	/**< actuator control groups, one after the other, 8 wide */

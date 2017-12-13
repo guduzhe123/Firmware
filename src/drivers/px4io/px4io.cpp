@@ -81,6 +81,7 @@
 #include <uORB/topics/safety.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_command.h>
+#include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/rc_channels.h>
 #include <uORB/topics/servorail_status.h>
 #include <uORB/topics/parameter_update.h>
@@ -262,6 +263,7 @@ private:
 	int			_t_param;		///< parameter update topic
 	bool			_param_update_force;	///< force a parameter update
 	int			_t_vehicle_command;	///< vehicle command topic
+	int			_t_vehicle_status;///< vehicle status for motor stop
 
 	/* advertised topics */
 	orb_advert_t 		_to_input_rc;		///< rc inputs from io
@@ -486,6 +488,7 @@ PX4IO::PX4IO(device::Device *interface) :
 	_t_param(-1),
 	_param_update_force(false),
 	_t_vehicle_command(-1),
+	_t_vehicle_status(-1),
 	_to_input_rc(nullptr),
 	_to_outputs(nullptr),
 	_to_servorail(nullptr),
@@ -901,12 +904,14 @@ PX4IO::task_main()
 	_t_vehicle_control_mode = orb_subscribe(ORB_ID(vehicle_control_mode));
 	_t_param = orb_subscribe(ORB_ID(parameter_update));
 	_t_vehicle_command = orb_subscribe(ORB_ID(vehicle_command));
+	_t_vehicle_status = orb_subscribe(ORB_ID(vehicle_status));
 
 	if ((_t_actuator_controls_0 < 0) ||
 	    (_t_actuator_armed < 0) ||
 	    (_t_vehicle_control_mode < 0) ||
 	    (_t_param < 0) ||
-	    (_t_vehicle_command < 0)) {
+	    (_t_vehicle_command < 0) ||
+	    (_t_vehicle_status < 0)) {
 		warnx("subscription(s) failed");
 		goto out;
 	}
@@ -993,6 +998,33 @@ PX4IO::task_main()
 			if (updated) {
 				io_set_arming_state();
 			}
+
+			struct vehicle_status_s vstatus;
+
+			static int motor_stop_num_prev = 0;
+
+			orb_check(_t_vehicle_status, &updated);
+
+			if (updated) {
+				orb_copy(ORB_ID(vehicle_status), _t_vehicle_status, &vstatus);//stupid mistake, use vehicle_status!!!
+				int motor_stop_num = vstatus.motor_stop_num;
+
+				/*static int loop_count = 0;
+				loop_count++;
+				if(loop_count%100 == 0){
+				    PX4_INFO("num = %d, prev = %d", motor_stop_num, motor_stop_num_prev);
+				}*/
+				if (motor_stop_num_prev != motor_stop_num) {
+					int rst = io_reg_set(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_MOTOR_STOP, motor_stop_num);
+
+					if (rst != OK) {
+						mavlink_log_critical(&_mavlink_log_pub, "set PX4IO_P_SETUP_MOTOR_STOP failed");
+					}
+
+					//mavlink_log_critical(&_mavlink_log_pub, "IO STOP M%d", vstatus.motor_stop_num);
+					motor_stop_num_prev = motor_stop_num;
+				}
+			}
 		}
 
 		if (!_armed && (now >= orb_check_last + ORB_CHECK_INTERVAL)) {
@@ -1017,6 +1049,7 @@ PX4IO::task_main()
 
 			/*
 			 * If parameters have changed, re-send RC mappings to IO
+			 * refer to this, change IO to stop motor
 			 *
 			 * XXX this may be a bit spammy
 			 */

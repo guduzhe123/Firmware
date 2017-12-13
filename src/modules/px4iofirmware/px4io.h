@@ -89,7 +89,7 @@ extern uint16_t			r_page_rc_input[];	/* PX4IO_PAGE_RC_INPUT */
 extern uint16_t			r_page_adc[];		/* PX4IO_PAGE_RAW_ADC_INPUT */
 
 extern volatile uint16_t	r_page_setup[];		/* PX4IO_PAGE_SETUP */
-extern uint16_t			r_page_controls[];	/* PX4IO_PAGE_CONTROLS */
+extern uint16_t			r_page_controls[];	/* PX4IO_PAGE_CONTROLS This is the connection*/
 extern uint16_t			r_page_rc_input_config[]; /* PX4IO_PAGE_RC_INPUT_CONFIG */
 extern uint16_t			r_page_servo_failsafe[]; /* PX4IO_PAGE_FAILSAFE_PWM */
 extern uint16_t			r_page_servo_control_min[]; /* PX4IO_PAGE_CONTROL_MIN_PWM */
@@ -130,6 +130,7 @@ extern uint16_t			r_page_servo_disarmed[];	/* PX4IO_PAGE_DISARMED_PWM */
 #define r_setup_sbus_rate	r_page_setup[PX4IO_P_SETUP_SBUS_RATE]
 #define r_setup_thr_fac		r_page_setup[PX4IO_P_SETUP_THR_MDL_FAC]
 #define r_setup_slew_max	r_page_setup[PX4IO_P_SETUP_MOTOR_SLEW_MAX]
+#define r_setup_motor_stop 	r_page_setup[PX4IO_P_SETUP_MOTOR_STOP]
 
 #define r_control_values	(&r_page_controls[0])
 

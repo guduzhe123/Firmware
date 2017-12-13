@@ -705,6 +705,23 @@ PARAM_DEFINE_INT32(COM_POS_FS_PROB, 30);
 PARAM_DEFINE_INT32(COM_POS_FS_GAIN, 10);
 
 /**
+ * Stop motor using parameter
+ *
+ * @min 0.0
+ * @max 1.0
+ * @group Commander
+ */
+PARAM_DEFINE_FLOAT(MOTOR_STOP_EN, 0.0f);
+
+/**
+ * Motor Stop Number
+ *
+ * @min 1
+ * @max 6
+ * @group Commander
+ */
+PARAM_DEFINE_INT32(MOTOR_STOP_NUM, 3);
+
  * Next flight UUID
  *
  * This number is incremented automatically after every flight on

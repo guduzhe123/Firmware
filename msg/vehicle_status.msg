@@ -65,6 +65,7 @@ uint8 data_link_lost_counter			# counts unique data link lost events
 bool engine_failure				# Set to true if an engine failure is detected
 bool engine_failure_cmd				# Set to true if an engine failure mode is commanded
 bool mission_failure				# Set to true if mission could not continue/finish
+uint32 motor_stop_num                # Motor stop number, 0 means No, 3 means 3, 34 means 3&4
 
 # see SYS_STATUS mavlink message for the following
 uint32 onboard_control_sensors_present
