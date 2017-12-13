@@ -35,8 +35,8 @@ set(config_module_list
 	#drivers/mkblctrl
 	drivers/mpu6000
 	drivers/mpu9250
-	drivers/ms4525_airspeed
-	drivers/ms5525_airspeed
+	# drivers/ms4525_airspeed
+	# drivers/ms5525_airspeed
 	drivers/ms5611
 	#drivers/oreoled
 	#drivers/protocol_splitter
@@ -46,7 +46,7 @@ set(config_module_list
 	drivers/px4fmu
 	drivers/px4io
 	drivers/rgbled
-	drivers/sdp3x_airspeed
+	# drivers/sdp3x_airspeed
 	drivers/sf0x
 	drivers/sf1xx
 	#drivers/snapdragon_rc_pwm
