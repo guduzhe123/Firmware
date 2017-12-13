@@ -198,6 +198,7 @@ static int32_t ccc_backdoor = 0;
 static bool ccc_takeover_enable = false;
 
 /*motor stop params*/
+int32_t mixer_stop_using_qgc = 0;
 int32_t mixer_switch = 0;//NOTICE!!! use this may cause stack overload!!!
 const char *mixer_devname = "/dev/pwm_output0";
 const char *mixer_fname_1 = "ROMFS/px4fmu_common/mixers/quad_h.main.mix";
@@ -1306,6 +1307,11 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 
 	case vehicle_command_s::VEHICLE_CMD_CT_MOTOR_STOP: {
 
+		if(!mixer_stop_using_qgc){
+			cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;
+            mavlink_log_critical(&mavlink_log_pub, "Motor won't stop, set MOTOR_STOP_QGC to 1");
+            break;
+		}
 		int motor_stop_enable =  (int)cmd->param1;
 		int motor_stop_num = (int)cmd->param2;
 		int motor_stop_pair = (int)cmd->param3;//0/1 all mean only 1, 2 means a pair
@@ -1508,6 +1514,7 @@ int commander_thread_main(int argc, char *argv[])
 	param_t _param_disarm_land = param_find("COM_DISARM_LAND");
 	param_t _param_motor_stop_num = param_find("MOTOR_STOP_NUM");
 	param_t _param_motor_stop_enable = param_find("MOTOR_STOP_EN");
+	param_t _param_mixer_stop_using_qgc = param_find("MOTOR_STOP_QGC");
 	param_t _param_mixer_switch = param_find("MIXER_SWITCH");
 	param_t _param_low_bat_act = param_find("COM_LOW_BAT_ACT");
 	param_t _param_offboard_loss_timeout = param_find("COM_OF_LOSS_T");
@@ -2067,6 +2074,7 @@ int commander_thread_main(int argc, char *argv[])
             int32_t motor_stop_num_oppo = 0;
 			param_get(_param_motor_stop_num, &motor_stop_num_param);
 			param_get(_param_motor_stop_enable, &motor_stop_enable);
+			param_get(_param_mixer_stop_using_qgc, &mixer_stop_using_qgc);
 			param_get(_param_mixer_switch, &mixer_switch);
 			int motor_stop_enable_int = (int)motor_stop_enable;
             static int motor_stop_enable_int_prev = 0;

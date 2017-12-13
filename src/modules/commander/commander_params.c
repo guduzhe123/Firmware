@@ -714,6 +714,15 @@ PARAM_DEFINE_INT32(COM_POS_FS_GAIN, 10);
 PARAM_DEFINE_FLOAT(MOTOR_STOP_EN, 0.0f);
 
 /**
+ * Stop motor using QGC
+ *
+ * @min 0
+ * @max 1
+ * @group Commander
+ */
+PARAM_DEFINE_INT32(MOTOR_STOP_QGC, 0);
+
+/**
  * Motor Stop Number
  *
  * @min 1
@@ -731,6 +740,7 @@ PARAM_DEFINE_INT32(MOTOR_STOP_NUM, 3);
  */
 PARAM_DEFINE_INT32(MIXER_SWITCH, 0);
 
+/**
  * Next flight UUID
  *
  * This number is incremented automatically after every flight on
