@@ -502,6 +502,15 @@ PARAM_DEFINE_FLOAT(MPC_JERK_MIN, 1.0f);
 PARAM_DEFINE_INT32(MPC_ALT_MODE, 0);
 
 /**
+ * Simple Mode Switch
+ *
+ * @min 0
+ * @max 2
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_INT32(SIMPLE_MODE_SW, 0);//follow MPC_ALT_MODE
+
+/**
  * Manual control stick exponential curve sensitivity attenuation with small velocity setpoints
  *
  * The higher the value the less sensitivity the stick has around zero

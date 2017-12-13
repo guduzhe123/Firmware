@@ -65,6 +65,7 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 
@@ -143,6 +144,7 @@ private:
 	int		_params_sub;			/**< notification of parameter updates */
 	int		_manual_sub;			/**< notification of manual control updates */
 	int		_local_pos_sub;			/**< vehicle local position */
+	int		_global_pos_sub;			/**< vehicle local position */
 	int		_pos_sp_triplet_sub;		/**< position setpoint triplet */
 	int		_home_pos_sub; 			/**< home position */
 
@@ -158,6 +160,7 @@ private:
 	struct manual_control_setpoint_s		_manual;		/**< r/c channel data */
 	struct vehicle_control_mode_s			_control_mode;		/**< vehicle control mode */
 	struct vehicle_local_position_s			_local_pos;		/**< vehicle local position */
+	struct vehicle_global_position_s		_global_pos;		/**< vehicle global position */
 	struct position_setpoint_triplet_s		_pos_sp_triplet;	/**< vehicle global position setpoint triplet */
 	struct vehicle_local_position_setpoint_s	_local_pos_sp;		/**< vehicle local position setpoint */
 	struct home_position_s				_home_pos; 				/**< home position */
@@ -228,6 +231,7 @@ private:
 		param_t hold_max_xy;
 		param_t hold_max_z;
 		param_t alt_mode;
+		param_t _simple_mode_sw;
 		param_t opt_recover;
 		param_t rc_flt_smp_rate;
 		param_t rc_flt_cutoff;
@@ -254,6 +258,7 @@ private:
 		float slow_land_alt1;
 		float slow_land_alt2;
 		int32_t alt_mode;
+		uint32_t _simple_mode_sw;
 
 		bool opt_recover;
 
@@ -288,6 +293,12 @@ private:
 	float _yaw;				/**< yaw angle (euler) */
 	float _yaw_takeoff;	/**< home yaw angle present when vehicle was taking off (euler) */
 	float _man_yaw_offset; /**< current yaw offset in manual mode */
+
+	bool _simple_mode_init_flag;//1 simple mode init flag
+	uint32_t _simple_mode_sw;//three modes，0：normal，1：simple，2：super simple
+	float _super_simple_sin_yaw;
+	float _super_simple_cos_yaw;
+	float _super_simple_last_bearing;
 
 	float _vel_max_xy;  /**< equal to vel_max except in auto mode when close to target */
 	float _acceleration_state_dependent_xy; /**< acceleration limit applied in manual mode */
@@ -418,6 +429,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_params_sub(-1),
 	_manual_sub(-1),
 	_local_pos_sub(-1),
+	_global_pos_sub(-1),
 	_pos_sp_triplet_sub(-1),
 	_home_pos_sub(-1),
 
@@ -432,6 +444,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_manual{},
 	_control_mode{},
 	_local_pos{},
+	_global_pos{},
 	_pos_sp_triplet{},
 	_local_pos_sp{},
 	_home_pos{},
@@ -467,6 +480,11 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_yaw(0.0f),
 	_yaw_takeoff(0.0f),
 	_man_yaw_offset(0.0f),
+	_simple_mode_init_flag(false),
+	_simple_mode_sw(0),
+	_super_simple_sin_yaw(0.0f),
+	_super_simple_cos_yaw(0.0f),
+	_super_simple_last_bearing(0.0f),
 	_vel_max_xy(0.0f),
 	_acceleration_state_dependent_xy(0.0f),
 	_acceleration_state_dependent_z(0.0f),
@@ -535,6 +553,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_params_handles.hold_max_xy = param_find("MPC_HOLD_MAX_XY");
 	_params_handles.hold_max_z = param_find("MPC_HOLD_MAX_Z");
 	_params_handles.alt_mode = param_find("MPC_ALT_MODE");
+	_params_handles._simple_mode_sw = param_find("SIMPLE_MODE_SW");
 	_params_handles.rc_flt_cutoff = param_find("RC_FLT_CUTOFF");
 	_params_handles.rc_flt_smp_rate = param_find("RC_FLT_SMP_RATE");
 
@@ -660,6 +679,9 @@ MulticopterPositionControl::parameters_update(bool force)
 
 		param_get(_params_handles.alt_mode, &v_i);
 		_params.alt_mode = v_i;
+
+		param_get(_params_handles._simple_mode_sw, &v_i);
+		_params._simple_mode_sw = v_i;
 
 		if (_vehicle_status.is_vtol) {
 			int32_t i = 0;
@@ -799,6 +821,12 @@ MulticopterPositionControl::poll_subscriptions()
 		// update the reset counters in any case
 		_z_reset_counter = _local_pos.z_reset_counter;
 		_xy_reset_counter = _local_pos.xy_reset_counter;
+	}
+
+	orb_check(_global_pos_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_global_position), _global_pos_sub, &_global_pos);
 	}
 
 	orb_check(_pos_sp_triplet_sub, &updated);
@@ -1343,9 +1371,76 @@ MulticopterPositionControl::control_manual(float dt)
 	}
 
 	if (_control_mode.flag_control_position_enabled) {
+#if CT_SIMPLE_MODE
+		//deal with simple mode
+		_simple_mode_sw = _params._simple_mode_sw;
+		float super_simple_radius = 10.0f;
+		float rollx, pitchx;
+
+		//keep manual.x/y the same
+		float _manual_x = _manual.x;
+		float _manual_y = _manual.y;
+
+		float simple_sin_yaw = sinf(-_home_pos.yaw);
+		float simple_cos_yaw = cosf(-_home_pos.yaw);
+		float sin_yaw = sinf(-_global_pos.yaw);
+		float cos_yaw = cosf(-_global_pos.yaw);
+
+		float home_bearing  = get_bearing_to_next_waypoint(_home_pos.lat, _home_pos.lon, _global_pos.lat, _global_pos.lon);
+		float home_distance = get_distance_to_next_waypoint(_home_pos.lat, _home_pos.lon, _global_pos.lat, _global_pos.lon);
+
+		if (!_simple_mode_init_flag) { //only run when first init
+			_super_simple_last_bearing = _wrap_pi(_home_pos.yaw + M_PI_F);
+			_super_simple_sin_yaw = simple_sin_yaw;
+			_super_simple_cos_yaw = simple_cos_yaw;
+			_simple_mode_init_flag = true;//run no more
+		}
+
+		// check if we are in super simple mode and at least 10m from home
+		if (_simple_mode_sw == 2 && home_distance > super_simple_radius) {
+			// check the bearing to home has changed by at least 5 degrees
+
+			/*PX4_INFO("_super_simple_last_bearing = %.2f, home_bearing = %.2f",
+			        (double)_super_simple_last_bearing, (double)home_bearing);*/
+
+			if (fabsf(_super_simple_last_bearing - home_bearing) > 5.0f * M_DEG_TO_RAD_F) {
+				_super_simple_last_bearing = home_bearing;
+				float angle_rad = _super_simple_last_bearing + M_PI_F;
+				_super_simple_cos_yaw = -cosf(angle_rad);//need negative
+				_super_simple_sin_yaw = sinf(angle_rad);
+				//printf("angle_rad = %.2f \n",(double)angle_rad);
+			}
+		}
+
+		if (_simple_mode_sw == 2) {
+			// rotate roll, pitch input by -super simple heading (reverse of heading to home)
+			rollx  = _manual_y * _super_simple_cos_yaw - _manual_x * _super_simple_sin_yaw;
+			pitchx = _manual_y * _super_simple_sin_yaw + _manual_x * _super_simple_cos_yaw;
+			_manual_y = rollx * cos_yaw + pitchx * sin_yaw;
+			_manual_x = -rollx * sin_yaw + pitchx * cos_yaw;
+
+		} else if (_simple_mode_sw == 1) {
+			// rotate roll, pitch input by -initial simple heading (i.e. north facing)
+			rollx = _manual_y * simple_cos_yaw - _manual_x * simple_sin_yaw; //x for pitch, y for roll
+			pitchx = _manual_y * simple_sin_yaw + _manual_x * simple_cos_yaw;
+			// rotate roll, pitch input from north facing to vehicle's perspective
+			_manual_y = rollx * cos_yaw + pitchx * sin_yaw;
+			_manual_x = -rollx * sin_yaw + pitchx * cos_yaw;
+		}
+
+		/*static int loop_count = 0;
+		if (loop_count++ % 100 == 0) {
+			printf("manual.x = %1.2f, y = %1.2f; simple.x = %1.2f, y = %1.2f\n",
+			       (double)_manual.x, (double)_manual.y, (double)_manual_x, (double)_manual_y);
+		}*/
+
 		/* set horizontal velocity setpoint with roll/pitch stick */
+		man_vel_sp(0) = math::expo_deadzone(_manual_x, _xy_vel_man_expo.get(), _hold_dz.get());
+		man_vel_sp(1) = math::expo_deadzone(_manual_y, _xy_vel_man_expo.get(), _hold_dz.get());
+#else
 		man_vel_sp(0) = math::expo_deadzone(_manual.x, _xy_vel_man_expo.get(), _hold_dz.get());
 		man_vel_sp(1) = math::expo_deadzone(_manual.y, _xy_vel_man_expo.get(), _hold_dz.get());
+#endif
 
 		const float man_vel_hor_length = ((matrix::Vector2f)man_vel_sp.slice<2, 1>(0, 0)).length();
 
@@ -2999,6 +3094,7 @@ MulticopterPositionControl::task_main()
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_manual_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
+	_global_pos_sub = orb_subscribe(ORB_ID(vehicle_global_position));
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_home_pos_sub = orb_subscribe(ORB_ID(home_position));
 
