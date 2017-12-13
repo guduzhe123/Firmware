@@ -228,6 +228,7 @@ PARAM_DEFINE_FLOAT(COM_HOME_V_T, 10.0f);
  * Setting this to 1 allows joystick control and disables RC input handling and the associated checks. A value of
  * 2 will generate RC control data from manual input received via MAVLink instead
  * of directly forwarding the manual input data.
+ * use this for CCC takeover. 1: disable RC check 2: simulate RC input
  *
  * @group Commander
  * @min 0
@@ -237,6 +238,20 @@ PARAM_DEFINE_FLOAT(COM_HOME_V_T, 10.0f);
  * @value 2 Virtual RC by Joystick
  */
 PARAM_DEFINE_INT32(COM_RC_IN_MODE, 0);
+
+/**
+ * CCC takeover backdoor
+ *
+ * The default value of 0 set CCC takeover disabled.
+ * A value of 1 set CCC takeover enabled.
+ *
+ * @group Commander
+ * @min 0
+ * @max 1
+ * @value 0 CCC takeover disabled
+ * @value 1 CCC takeover enabled
+ */
+PARAM_DEFINE_INT32(CCC_BACKDOOR, 0);
 
 /**
  * RC input arm/disarm command duration

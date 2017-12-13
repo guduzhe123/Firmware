@@ -191,6 +191,10 @@ static int daemon_task;					/**< Handle of daemon task / thread */
 static bool _usb_telemetry_active = false;
 static hrt_abstime commander_boot_timestamp = 0;
 
+// ccc takeover flag
+static int32_t ccc_backdoor = 0;
+static bool ccc_takeover_enable = false;
+
 static unsigned int leds_counter;
 /* To remember when last notification was sent */
 static uint64_t last_print_mode_reject_time = 0;
@@ -981,6 +985,38 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 		}
 		break;
 
+		// for GCS
+		case vehicle_command_s::VEHICLE_CMD_CCC_TAKEOVER: {
+			/* set CCC takeover */
+			if(ccc_backdoor == 0){
+				mavlink_log_critical(&mavlink_log_pub, "CCC takeover not enabled");
+				break;
+			}
+			ccc_takeover_enable = true;
+			status.rc_input_mode = vehicle_status_s::RC_IN_MODE_OFF;
+			set_tune(TONE_NOTIFY_POSITIVE_TUNE);
+			mavlink_log_critical(&mavlink_log_pub, "CCC takeover");
+			//send CCC ack
+			cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+		}
+			break;
+
+		case vehicle_command_s::VEHICLE_CMD_CCC_YIELD: {
+			if(ccc_backdoor == 0){
+				mavlink_log_critical(&mavlink_log_pub, "CCC takeover not enabled");
+				break;
+			}
+			/* set CCC yield */
+			ccc_takeover_enable = false;
+			//only this, no other option
+			status.rc_input_mode = vehicle_status_s::RC_IN_MODE_DEFAULT;
+			set_tune(TONE_NOTIFY_POSITIVE_TUNE);
+			mavlink_log_critical(&mavlink_log_pub, "CCC yield");
+			//set_ccc_takeover_mode(CCC_YIELD);
+			cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+		}
+			break;
+
 	case vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION: {
 			if (cmd->param1 > 1.5f) {
 				armed_local->lockdown = true;
@@ -1361,6 +1397,7 @@ int commander_thread_main(int argc, char *argv[])
 	param_t _param_ef_current2throttle_thres = param_find("COM_EF_C2T");
 	param_t _param_ef_time_thres = param_find("COM_EF_TIME");
 	param_t _param_rc_in_off = param_find("COM_RC_IN_MODE");
+	param_t _param_ccc_backdoor = param_find("CCC_BACKDOOR");
 	param_t _param_rc_arm_hyst = param_find("COM_RC_ARM_HYST");
 	param_t _param_min_stick_change = param_find("COM_RC_STICK_OV");
 	param_t _param_eph = param_find("COM_HOME_H_T");
@@ -1482,6 +1519,7 @@ int commander_thread_main(int argc, char *argv[])
 	status_flags.offboard_control_signal_lost = true;
 	status.data_link_lost = true;
 	status_flags.offboard_control_loss_timeout = false;
+    ccc_takeover_enable = ccc_backdoor!=0;//ccc_backdoor = 0, ccc_state = 0
 
 	status_flags.condition_system_prearm_error_reported = false;
 	status_flags.condition_system_hotplug_timeout = false;
@@ -1749,6 +1787,7 @@ int commander_thread_main(int argc, char *argv[])
 	bool hotplug_timeout = hrt_elapsed_time(&commander_boot_timestamp) > HOTPLUG_SENS_TIMEOUT;
 
 	param_get(_param_rc_in_off, &rc_in_off);
+	param_get(_param_ccc_backdoor, &ccc_backdoor);
 
 	int32_t arm_switch_is_button = 0;
 	param_get(_param_arm_switch_is_button, &arm_switch_is_button);
@@ -1761,7 +1800,17 @@ int commander_thread_main(int argc, char *argv[])
 	param_get(_param_arm_mission_required, &arm_mission_required_param);
 	arm_requirements |= (arm_mission_required_param & (ARM_REQ_MISSION_BIT | ARM_REQ_ARM_AUTH_BIT));
 
-	status.rc_input_mode = rc_in_off;
+	// default: backdoor = 0, CCC takeover = 1; init only one time
+	if(ccc_backdoor == 0){
+		status.rc_input_mode = rc_in_off;
+	}else if(ccc_backdoor == 1){
+		if(ccc_takeover_enable == CCC_TAKEOVER){
+			status.rc_input_mode = vehicle_status_s::RC_IN_MODE_OFF;
+		}else{
+			status.rc_input_mode = vehicle_status_s::RC_IN_MODE_DEFAULT;
+		}
+	}
+
 	if (status.hil_state == vehicle_status_s::HIL_STATE_ON) {
 		// HIL configuration selected: real sensors will be disabled
 		status_flags.condition_system_sensors_initialized = false;
@@ -1886,7 +1935,11 @@ int commander_thread_main(int argc, char *argv[])
 			param_get(_param_datalink_loss_timeout, &datalink_loss_timeout);
 			param_get(_param_rc_loss_timeout, &rc_loss_timeout);
 			param_get(_param_rc_in_off, &rc_in_off);
-			status.rc_input_mode = rc_in_off;
+			param_get(_param_ccc_backdoor, &ccc_backdoor);
+			// make sure not override by param change, only do this when ccc_backdoor == 1
+			if(ccc_backdoor == 0){
+				status.rc_input_mode = rc_in_off;
+			}
 			param_get(_param_rc_arm_hyst, &rc_arm_hyst);
 			param_get(_param_min_stick_change, &min_stick_change);
 			param_get(_param_rc_override, &rc_override);
@@ -2999,6 +3052,11 @@ int commander_thread_main(int argc, char *argv[])
 				status.data_link_lost = true;
 				status.data_link_lost_counter++;
 				status_changed = true;
+                // GCS lost, set ccc takeover back to RC
+				if(ccc_takeover_enable){
+                    ccc_takeover_enable = false;
+					status.rc_input_mode = vehicle_status_s::RC_IN_MODE_DEFAULT;
+				}
 			}
 		}
 
@@ -3994,6 +4052,7 @@ set_control_mode()
 	control_mode.flag_armed = armed.armed;
 	control_mode.flag_external_manual_override_ok = (!status.is_rotary_wing && !status.is_vtol);
 	control_mode.flag_system_hil_enabled = status.hil_state == vehicle_status_s::HIL_STATE_ON;
+    control_mode.flag_ccc_takeover_enabled = ccc_takeover_enable == CCC_TAKEOVER;
 	control_mode.flag_control_offboard_enabled = false;
 
 	switch (status.nav_state) {

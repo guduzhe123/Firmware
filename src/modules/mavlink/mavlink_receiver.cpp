@@ -1553,6 +1553,7 @@ MavlinkReceiver::handle_message_rc_channels_override(mavlink_message_t *msg)
 
 	} else {
 		orb_publish(ORB_ID(input_rc), _rc_pub, &rc);
+		//still use this on GCS to send gimbal control when CCC takeover
 	}
 }
 
@@ -1567,6 +1568,7 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 		return;
 	}
 
+	// sim RC input from manual_control but not channels_override
 	if (_mavlink->get_manual_input_mode_generation()) {
 
 		struct rc_input_values rc = {};
@@ -1610,6 +1612,7 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 			_rc_pub = orb_advertise(ORB_ID(input_rc), &rc);
 
 		} else {
+			// todo close this when CCC takeover
 			orb_publish(ORB_ID(input_rc), _rc_pub, &rc);
 		}
 

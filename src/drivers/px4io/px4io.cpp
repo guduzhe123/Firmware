@@ -233,6 +233,7 @@ private:
 
 	unsigned 		_update_interval;	///< Subscription interval limiting send rate
 	bool			_rc_handling_disabled;	///< If set, IO does not evaluate, but only forward the RC values
+	bool			_ccc_takeover_enabled; ///ccc takeover flag from control mode
 	unsigned		_rc_chan_count;		///< Internal copy of the last seen number of RC channels
 	uint64_t		_rc_last_valid;		///< last valid timestamp
 
@@ -1349,6 +1350,7 @@ PX4IO::io_set_arming_state()
 	int have_armed = orb_copy(ORB_ID(actuator_armed), _t_actuator_armed, &armed);
 	int have_control_mode = orb_copy(ORB_ID(vehicle_control_mode), _t_vehicle_control_mode, &control_mode);
 	_in_esc_calibration_mode = armed.in_esc_calibration_mode;
+	_ccc_takeover_enabled = control_mode.flag_ccc_takeover_enabled;
 
 	uint16_t set = 0;
 	uint16_t clear = 0;
@@ -1865,11 +1867,15 @@ PX4IO::io_publish_raw_rc()
 		}
 	}
 
+	// todo disable RC pub when CCC takeover, not to disable from here
 	/* lazily advertise on first publication */
 	if (_to_input_rc == nullptr) {
 		_to_input_rc = orb_advertise(ORB_ID(input_rc), &rc_val);
 
 	} else {
+		/* skip publish rc when CCC takeover */
+		if (_ccc_takeover_enabled) { return OK; }
+
 		orb_publish(ORB_ID(input_rc), _to_input_rc, &rc_val);
 	}
 

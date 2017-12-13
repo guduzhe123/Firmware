@@ -65,6 +65,7 @@ InputRC::~InputRC()
 
 int InputRC::initialize()
 {
+	//gimbal control from manual control
 	_manual_control_setpoint_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
 
 	if (_manual_control_setpoint_sub < 0) {

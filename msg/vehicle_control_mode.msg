@@ -7,6 +7,7 @@ bool flag_external_manual_override_ok		# external override non-fatal for system.
 
 # XXX needs yet to be set by state machine helper
 bool flag_system_hil_enabled
+bool flag_ccc_takeover_enabled
 
 bool flag_control_manual_enabled		# true if manual input is mixed in
 bool flag_control_auto_enabled			# true if onboard autopilot should act
