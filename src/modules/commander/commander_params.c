@@ -708,7 +708,7 @@ PARAM_DEFINE_INT32(COM_POS_FS_GAIN, 10);
  * Stop motor using parameter
  *
  * @min 0.0
- * @max 1.0
+ * @max 2.0
  * @group Commander
  */
 PARAM_DEFINE_FLOAT(MOTOR_STOP_EN, 0.0f);
