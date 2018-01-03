@@ -83,8 +83,6 @@
 #include <commander/px4_custom_mode.h>
 #include <geo/geo.h>
 
-#include <uORB/topics/vehicle_command_ack.h>
-
 #include "mavlink_bridge_header.h"
 #include "mavlink_receiver.h"
 #include "mavlink_main.h"
@@ -138,6 +136,9 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_debug_vect_pub(nullptr),
 	_gps_inject_data_pub(nullptr),
 	_command_ack_pub(nullptr),
+	mavlink_log_pub(nullptr),
+	_companion_computer_pub(nullptr),
+	command_ack_pub(nullptr),
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_actuator_armed_sub(orb_subscribe(ORB_ID(actuator_armed))),
 	_global_ref_timestamp(0),
@@ -149,6 +150,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_offboard_control_mode{},
 	_att_sp{},
 	_rates_sp{},
+	_f3_report{},
 	_time_offset_avg_alpha(0.8),
 	_time_offset(0),
 	_orb_class_instance(-1),
@@ -163,7 +165,6 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 MavlinkReceiver::~MavlinkReceiver()
 {
 	orb_unsubscribe(_control_mode_sub);
-	orb_unsubscribe(_actuator_armed_sub);
 }
 
 void MavlinkReceiver::acknowledge(uint8_t sysid, uint8_t compid, uint16_t command, uint8_t result)
@@ -384,6 +385,7 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 	/* If we've received a valid message, mark the flag indicating so.
 	   This is used in the '-w' command-line flag. */
 	_mavlink->set_has_received_messages(true);
+
 }
 
 bool
@@ -586,7 +588,7 @@ MavlinkReceiver::handle_message_command_ack(mavlink_message_t *msg)
 		.result_param2 = ack.result_param2,
 		.command = ack.command,
 		.result = ack.result,
-		.from_external = true,
+		.from_external = false,
 		.result_param1 = ack.progress,
 		.target_system = ack.target_system,
 		.target_component = ack.target_component
@@ -1639,24 +1641,44 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 		mavlink_heartbeat_t hb;
 		mavlink_msg_heartbeat_decode(msg, &hb);
 
-		/* ignore own heartbeats, accept only heartbeats from GCS */
-		if (msg->sysid != mavlink_system.sysid && hb.type == MAV_TYPE_GCS) {
+		switch (hb.type) {
+		case MAV_TYPE_GCS:
 
-			struct telemetry_status_s &tstatus = _mavlink->get_rx_status();
+			/* ignore own heartbeats, accept only heartbeats from GCS */
+			if (msg->sysid != mavlink_system.sysid) {
 
-			/* set heartbeat time and topic time and publish -
-			 * the telem status also gets updated on telemetry events
-			 */
-			tstatus.timestamp = hrt_absolute_time();
-			tstatus.heartbeat_time = tstatus.timestamp;
+				struct telemetry_status_s &tstatus = _mavlink->get_rx_status();
 
-			if (_telemetry_status_pub == nullptr) {
-				int multi_instance;
-				_telemetry_status_pub = orb_advertise_multi(ORB_ID(telemetry_status), &tstatus, &multi_instance, ORB_PRIO_HIGH);
+				/* set heartbeat time and topic time and publish -
+				 * the telem status also gets updated on telemetry events
+				 */
+				tstatus.timestamp = hrt_absolute_time();
+				tstatus.heartbeat_time = tstatus.timestamp;
+
+				if (_telemetry_status_pub == nullptr) {
+					int multi_instance;
+					_telemetry_status_pub = orb_advertise_multi(ORB_ID(telemetry_status), &tstatus, &multi_instance, ORB_PRIO_HIGH);
+
+				} else {
+					orb_publish(ORB_ID(telemetry_status), _telemetry_status_pub, &tstatus);
+				}
+			}
+
+			break;
+
+		/* receive compainon computer heartbeat and report on the GCS */
+		case MAV_TYPE_ONBOARD_CONTROLLER:
+			_f3_report.time_f3 = 0;
+			_f3_report.onboard = true;
+
+			if (_companion_computer_pub == nullptr) {
+				_companion_computer_pub = orb_advertise(ORB_ID(companion_computer_report), &_f3_report);
 
 			} else {
-				orb_publish(ORB_ID(telemetry_status), _telemetry_status_pub, &tstatus);
+				orb_publish(ORB_ID(companion_computer_report), _companion_computer_pub, &_f3_report);
 			}
+
+			break;
 		}
 	}
 }

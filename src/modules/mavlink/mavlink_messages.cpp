@@ -480,6 +480,10 @@ protected:
 				sent = true;
 
 			} else {
+				if (cmd.command == 2520) {
+					MavlinkCommandSender::instance().handle_vehicle_command(cmd, _mavlink->get_channel());
+				}
+
 				if (_mavlink->verbose()) {
 					PX4_INFO("not forwarding command %d to %d/%d", cmd.command, cmd.target_system, cmd.target_component);
 				}

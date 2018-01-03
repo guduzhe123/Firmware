@@ -122,6 +122,7 @@
 #include <uORB/topics/vehicle_status_flags.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/companion_computer_report.h>
 
 #include "../systemcmds/mixer/mixer.h"
 
@@ -270,6 +271,10 @@ static uint8_t arm_requirements = ARM_REQ_NONE;
 static bool _last_condition_global_position_valid = false;
 
 static struct vehicle_land_detected_s land_detector = {};
+
+struct companion_computer_report_s  _f3_report = {};
+
+bool _f3_onboard_pre = false;
 
 /**
  * The daemon app only briefly exists to start
@@ -1546,6 +1551,8 @@ int commander_thread_main(int argc, char *argv[])
 	/* failsafe response to loss of navigation accuracy */
 	param_t _param_posctl_nav_loss_act = param_find("COM_POSCTL_NAVL");
 
+    param_t _param_com_computer = param_find("COM_COMPUTER");
+
 	// These are too verbose, but we will retain them a little longer
 	// until we are sure we really don't need them.
 
@@ -1837,6 +1844,9 @@ int commander_thread_main(int argc, char *argv[])
 	int system_power_sub = orb_subscribe(ORB_ID(system_power));
 	struct system_power_s system_power;
 	memset(&system_power, 0, sizeof(system_power));
+
+	/* Subscribe companion computer report*/
+	int _companion_computer_sub = orb_subscribe(ORB_ID(companion_computer_report));
 
 	/* Subscribe to actuator controls (outputs) */
 	int actuator_controls_sub = orb_subscribe(ORB_ID_VEHICLE_ATTITUDE_CONTROLS);
@@ -3219,6 +3229,30 @@ int commander_thread_main(int argc, char *argv[])
 				}
 			}
 		}
+
+		/* Check if companion computer is OK when param Companion_Computer_Enable = 1*/
+        int Companion_Computer_Enable;
+        param_get(_param_com_computer,&Companion_Computer_Enable);
+        if (Companion_Computer_Enable){
+            orb_check(_companion_computer_sub, &updated);
+
+            if (updated) {
+                orb_copy(ORB_ID(companion_computer_report), _companion_computer_sub, &_f3_report);
+            }
+			/* massage from companion computer is 1Hz while commander's update frequence is 100Hz */
+            _f3_report.time_f3++;
+            if ( _f3_report.time_f3 / 100 == 2){
+                if ( _f3_report.time_f3 % 100 == 1){
+                    _f3_report.onboard = false;
+					mavlink_log_emergency(&mavlink_log_pub, " Companion Computer Lost!");
+                }
+            }
+
+			if (_f3_report.onboard && _f3_report.onboard != _f3_onboard_pre){
+                mavlink_log_emergency(&mavlink_log_pub, " Companion Computer Is Onboard!");
+			}
+            _f3_onboard_pre = _f3_report.onboard;
+        }
 
 		/* handle commands last, as the system needs to be updated to handle them */
 		orb_check(actuator_controls_sub, &updated);

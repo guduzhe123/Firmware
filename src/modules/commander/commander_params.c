@@ -751,3 +751,10 @@ PARAM_DEFINE_INT32(MIXER_SWITCH, 0);
  * @min 0
  */
 PARAM_DEFINE_INT32(COM_FLIGHT_UUID, 0);
+
+/**
+ * Link between Commpanion computer and Pixhawk
+ * 0 for discorrect, 1 for correct.
+ *
+ */
+PARAM_DEFINE_INT32(COM_COMPUTER, 0);

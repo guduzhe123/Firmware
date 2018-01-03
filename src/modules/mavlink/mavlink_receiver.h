@@ -77,6 +77,8 @@
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/collision_report.h>
+#include <uORB/topics/companion_computer_report.h>
+#include <uORB/topics/vehicle_command_ack.h>
 
 #include "mavlink_mission.h"
 #include "mavlink_parameters.h"
@@ -247,6 +249,9 @@ private:
 	static const int _gps_inject_data_queue_size = 6;
 	orb_advert_t _gps_inject_data_pub;
 	orb_advert_t _command_ack_pub;
+	orb_advert_t mavlink_log_pub;
+	orb_advert_t _companion_computer_pub;
+	orb_advert_t command_ack_pub;
 	int _control_mode_sub;
 	int _actuator_armed_sub;
 	uint64_t _global_ref_timestamp;
@@ -258,6 +263,7 @@ private:
 	struct offboard_control_mode_s _offboard_control_mode;
 	struct vehicle_attitude_setpoint_s _att_sp;
 	struct vehicle_rates_setpoint_s _rates_sp;
+	struct companion_computer_report_s  _f3_report;
 	double _time_offset_avg_alpha;
 	int64_t _time_offset;
 	int	_orb_class_instance;
