@@ -4342,6 +4342,9 @@ private:
 	MavlinkOrbSubscription *_sub;
 	uint64_t _stm32_f3_time;
 
+	MavlinkOrbSubscription *_armed_sub;
+	uint64_t _armed_time;
+
 	// do not allow top copying this class
 	MavlinkStreamStm32F3CMD(MavlinkStreamStm32F3CMD &);
 	MavlinkStreamStm32F3CMD &operator = (const MavlinkStreamStm32F3CMD &);
@@ -4349,19 +4352,30 @@ private:
 protected:
 	explicit MavlinkStreamStm32F3CMD(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_sub(_mavlink->add_orb_subscription(ORB_ID(stm32_f3_cmd))),
-		_stm32_f3_time(0)
+		_stm32_f3_time(0),
+		_armed_sub(_mavlink->add_orb_subscription(ORB_ID(actuator_armed))),
+		_armed_time(0)
 	{}
 
 	bool send(const hrt_abstime t)
 	{
-		struct stm32_f3_cmd_s _stm32_f3_msg;
+		struct actuator_armed_s armed = {};
 
-		if (_sub->update(&_stm32_f3_time, &_stm32_f3_msg)) {
+		if (_armed_sub->update(&_armed_time, &armed)) {
 			mavlink_stm32_f3_command_t _msg_stm32_f3 = {};
-			_msg_stm32_f3.command = _stm32_f3_msg.command;
 
-			strncpy(_msg_stm32_f3.f3_log, (const char *)_stm32_f3_msg.f3_log, sizeof(_msg_stm32_f3.f3_log));
+			const char *message ;
 
+			if (armed.armed == 1) {
+				message = "0x80: Armed";
+				_msg_stm32_f3.command = 0x80;
+
+			} else {
+				message = "0x81: Disarmed";
+				_msg_stm32_f3.command = 0x81;
+			}
+
+			strncpy(_msg_stm32_f3.f3_log, message, sizeof(_msg_stm32_f3.f3_log));
 			_msg_stm32_f3.f3_log[sizeof(_msg_stm32_f3.f3_log) - 1] = '\0';
 
 			mavlink_msg_stm32_f3_command_send_struct(_mavlink->get_channel(), &_msg_stm32_f3);

@@ -2052,6 +2052,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("VFR_HUD", 4.0f);
 		configure_stream("WIND_COV", 1.0f);
 		configure_stream("CAMERA_IMAGE_CAPTURED");
+		configure_stream("STM32F3_CMD", 5.0f);
 		break;
 
 	case MAVLINK_MODE_ONBOARD:
@@ -2088,6 +2089,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("CAMERA_TRIGGER");
 		configure_stream("CAMERA_IMAGE_CAPTURED");
 		configure_stream("ACTUATOR_CONTROL_TARGET0", 10.0f);
+		configure_stream("STM32F3_CMD", 5.0f);
 		break;
 
 	case MAVLINK_MODE_OSD:
@@ -2105,6 +2107,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("VFR_HUD", 25.0f);
 		configure_stream("WIND_COV", 2.0f);
 		configure_stream("SYSTEM_TIME", 1.0f);
+		configure_stream("STM32F3_CMD", 5.0f);
 		break;
 
 	case MAVLINK_MODE_MAGIC:
@@ -2146,10 +2149,12 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("CAMERA_IMAGE_CAPTURED");
 		configure_stream("ACTUATOR_CONTROL_TARGET0", 30.0f);
 		configure_stream("MANUAL_CONTROL", 5.0f);
+		configure_stream("STM32F3_CMD", 5.0f);
 		break;
 
 	case MAVLINK_MODE_IRIDIUM:
 		configure_stream("HIGH_LATENCY", 0.1f);
+		configure_stream("STM32F3_CMD", 5.0f);
 		break;
 
 	default:
