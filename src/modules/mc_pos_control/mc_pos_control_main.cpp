@@ -69,6 +69,7 @@
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_command.h>
+#include <uORB/topics/debug_vect.h>
 
 #include <float.h>
 #include <lib/geo/geo.h>
@@ -141,6 +142,7 @@ private:
 	int		_control_task;			/**< task handle for task */
 	orb_advert_t	_mavlink_log_pub;		/**< mavlink log advert */
 
+
 	int		_vehicle_status_sub;		/**< vehicle status subscription */
 	int		_vehicle_land_detected_sub;	/**< vehicle land detected subscription */
 	int		_vehicle_attitude_sub;		/**< control state subscription */
@@ -155,6 +157,7 @@ private:
 	orb_advert_t	_att_sp_pub;			/**< attitude setpoint publication */
 	orb_advert_t	_local_pos_sp_pub;		/**< vehicle local position setpoint publication */
 	orb_advert_t    _vehicle_command_pub;       /**< vehicle command*/
+	orb_advert_t    _debug_vect_pub;
 
 	orb_id_t _attitude_setpoint_id;
 
@@ -170,6 +173,7 @@ private:
 	struct vehicle_local_position_setpoint_s	_local_pos_sp;		/**< vehicle local position setpoint */
 	struct home_position_s				_home_pos; 				/**< home position */
 	struct vehicle_command_s 			_vcmd;                   /**< landing gear command*/
+	struct debug_vect_s                 _debug_vect_msg;
 
 	control::BlockParamFloat _manual_thr_min; /**< minimal throttle output when flying in manual mode */
 	control::BlockParamFloat _manual_thr_max; /**< maximal throttle output when flying in manual mode */
@@ -241,6 +245,8 @@ private:
 		param_t opt_recover;
 		param_t rc_flt_smp_rate;
 		param_t rc_flt_cutoff;
+		param_t smooth_disable;
+		param_t  judge_disable;
 	}		_params_handles;		/**< handles for interesting parameters */
 
 	struct {
@@ -275,6 +281,9 @@ private:
 		math::Vector<3> vel_p;
 		math::Vector<3> vel_i;
 		math::Vector<3> vel_d;
+
+		int smooth_disable;
+		int judge_disable;
 	} _params{};
 
 	struct map_projection_reference_s _ref_pos;
@@ -445,6 +454,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_att_sp_pub(nullptr),
 	_local_pos_sp_pub(nullptr),
 	_vehicle_command_pub(nullptr),
+	_debug_vect_pub(nullptr),
 	_attitude_setpoint_id(nullptr),
 	_vehicle_status{},
 	_vehicle_land_detected{},
@@ -458,6 +468,7 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_local_pos_sp{},
 	_home_pos{},
 	_vcmd{},
+	_debug_vect_msg{},
 	_manual_thr_min(this, "MANTHR_MIN"),
 	_manual_thr_max(this, "MANTHR_MAX"),
 	_xy_vel_man_expo(this, "XY_MAN_EXPO"),
@@ -566,6 +577,8 @@ MulticopterPositionControl::MulticopterPositionControl() :
 	_params_handles._simple_mode_sw = param_find("SIMPLE_MODE_SW");
 	_params_handles.rc_flt_cutoff = param_find("RC_FLT_CUTOFF");
 	_params_handles.rc_flt_smp_rate = param_find("RC_FLT_SMP_RATE");
+	_params_handles.smooth_disable = param_find("MPC_SMOOTH_DIS");
+	_params_handles.judge_disable = param_find("MPC_JUDG_DIS");
 
 	/* fetch initial parameter values */
 	parameters_update(true);
@@ -675,6 +688,9 @@ MulticopterPositionControl::parameters_update(bool force)
 		/* make sure the filter is in its stable region -> fc < fs/2 */
 		_params.rc_flt_cutoff = math::constrain(_params.rc_flt_cutoff, 0.1f, (_params.rc_flt_smp_rate / 2.0f) - 1.f);
 
+		param_get(_params_handles.smooth_disable, &(_params.smooth_disable));
+
+		param_get(_params_handles.judge_disable, &(_params.judge_disable));
 		/* update filters */
 		_filter_manual_pitch.set_cutoff_frequency(_params.rc_flt_smp_rate, _params.rc_flt_cutoff);
 		_filter_manual_roll.set_cutoff_frequency(_params.rc_flt_smp_rate, _params.rc_flt_cutoff);
@@ -1031,7 +1047,6 @@ MulticopterPositionControl::send_landing_gear_vcmd(int up_or_down)
 
 	} else {
 		orb_publish(ORB_ID(vehicle_command), _vehicle_command_pub, &_vcmd);
-		PX4_INFO("pub send_landing_gear_vcmd");
 	}
 }
 
@@ -1140,6 +1155,8 @@ MulticopterPositionControl::set_manual_acceleration_z(float &max_acceleration, c
 		intention = brake;
 	}
 
+	_debug_vect_msg.z = (float)intention;
+
 	/* get max and min acceleration where min acceleration is just 1/5 of max acceleration */
 	max_acceleration = (stick_z <= 0.0f) ? _acceleration_z_max_up.get() : _acceleration_z_max_down.get();
 
@@ -1152,7 +1169,13 @@ MulticopterPositionControl::set_manual_acceleration_z(float &max_acceleration, c
 		_acceleration_state_dependent_z = _acceleration_z_max_down.get();
 
 		/* reset slew rate */
-		_vel_sp_prev(2) = _vel(2);
+		if (_params.smooth_disable) {
+			_vel_sp_prev(2) = _vel_sp(2);
+
+		} else {
+			_vel_sp_prev(2) = _vel(2);
+		}
+
 		_user_intention_z = brake;
 	}
 
@@ -1205,6 +1228,7 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 	const bool is_current_zero = (fabsf(stick_xy.length()) <= FLT_EPSILON);
 
 	/* check acceleration */
+	// is_prev_zero isn't a good judgement for acceleration if prev is zero and now is zero it is still acceleration.
 	const bool do_acceleration = is_prev_zero || (is_aligned &&
 				     ((stick_xy.length() > _stick_input_xy_prev.length()) || (fabsf(stick_xy.length() - 1.0f) < FLT_EPSILON)));
 
@@ -1235,7 +1259,7 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 		intention = acceleration;
 	}
 
-
+	_debug_vect_msg.x = (float)intention;
 	/*
 	 * update user intention
 	 */
@@ -1260,10 +1284,26 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 
 		}
 
-		/* reset slew rate */
-		_vel_sp_prev(0) = _vel(0);
-		_vel_sp_prev(1) = _vel(1);
+		PX4_INFO("brake");
 
+//		 reset slew rate
+		if (!_params.smooth_disable && !_params.judge_disable) {
+			_vel_sp_prev(0) = _vel(0);
+			_vel_sp_prev(1) = _vel(1);
+
+		} else if (_params.smooth_disable && !_params.judge_disable) {
+			_vel_sp_prev(0) = _vel_sp(0);
+			_vel_sp_prev(1) = _vel_sp(1);
+
+		} else if (!_params.smooth_disable && _params.judge_disable) {
+			if (fabsf(_vel(0)) < fabsf(_vel_sp(0))) {
+				_vel_sp_prev(0) = _vel(0);
+			}
+
+			if (fabsf(_vel(1)) < fabsf(_vel_sp(1))) {
+				_vel_sp_prev(1) = _vel(1);
+			}
+		}
 	}
 
 	switch (_user_intention_xy) {
@@ -1379,6 +1419,8 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 		_acceleration_state_dependent_xy = _acceleration_hor_max.get();
 
 	}
+
+	_debug_vect_msg.y = _acceleration_state_dependent_xy;
 
 	/* update previous stick input */
 	_stick_input_xy_prev = matrix::Vector2f(_filter_manual_pitch.apply(stick_xy(0)),
@@ -1515,6 +1557,13 @@ MulticopterPositionControl::control_manual(float dt)
 	float stick_z = man_vel_sp(2);
 	float max_acc_z;
 	set_manual_acceleration_z(max_acc_z, stick_z, dt);
+
+	if (_debug_vect_pub == nullptr) {
+		_debug_vect_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect_msg);
+
+	} else {
+		orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &_debug_vect_msg);
+	}
 
 	/* prepare cruise speed (m/s) vector to scale the velocity setpoint */
 	float vel_mag = (_velocity_hor_manual.get() < _vel_max_xy) ? _velocity_hor_manual.get() : _vel_max_xy;
