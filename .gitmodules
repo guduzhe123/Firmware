@@ -1,10 +1,10 @@
 [submodule "mavlink/include/mavlink/v1.0"]
 	path = mavlink/include/mavlink/v1.0
-	url = https://github.com/mavlink/c_library_v1.git
+	url = https://gitlab.com/Clobotics/FlightControlPX4/mavlink-c_library_v1.git
 	branch = master
 [submodule "mavlink/include/mavlink/v2.0"]
 	path = mavlink/include/mavlink/v2.0
-	url = https://github.com/mavlink/c_library_v2.git
+	url = https://gitlab.com/Clobotics/FlightControlPX4/mavlink-c_library_v2.git
 	branch = master
 [submodule "src/modules/uavcan/libuavcan"]
 	path = src/modules/uavcan/libuavcan
