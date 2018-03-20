@@ -55,6 +55,9 @@
 #include <systemlib/err.h>
 #include <systemlib/mavlink_log.h>
 
+#include <v2.0/common/mavlink_msg_stm32_f3_command.h>
+#include <v2.0/common/mavlink_msg_stm32_f3_motor_curr.h>
+
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
@@ -96,6 +99,8 @@
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/topics/mount_orientation.h>
 #include <uORB/topics/collision_report.h>
+#include <uORB/topics/stm32_f3_cmd.h>
+#include <uORB/topics/stm32_f3_motor_curr.h>
 #include <uORB/uORB.h>
 
 
@@ -4303,6 +4308,131 @@ protected:
 	}
 };
 
+class MavlinkStreamStm32F3CMD : public MavlinkStream
+{
+public:
+	const char *get_name() const
+	{
+		return MavlinkStreamStm32F3CMD::get_name_static();
+	}
+	static const char *get_name_static()
+	{
+		return "STM32F3_CMD";
+	}
+
+	static uint16_t get_id_static()
+	{
+		return MAVLINK_MSG_ID_STM32_F3_COMMAND;
+	}
+
+	uint16_t get_id()
+	{
+		return get_id_static();
+	}
+	static MavlinkStream *new_instance(Mavlink *mavlink)
+	{
+		return new MavlinkStreamStm32F3CMD(mavlink);
+	}
+	unsigned get_size()
+	{
+		return MAVLINK_MSG_ID_STM32_F3_COMMAND + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+	}
+
+private:
+	MavlinkOrbSubscription *_sub;
+	uint64_t _stm32_f3_time;
+
+	// do not allow top copying this class
+	MavlinkStreamStm32F3CMD(MavlinkStreamStm32F3CMD &);
+	MavlinkStreamStm32F3CMD &operator = (const MavlinkStreamStm32F3CMD &);
+
+protected:
+	explicit MavlinkStreamStm32F3CMD(Mavlink *mavlink) : MavlinkStream(mavlink),
+		_sub(_mavlink->add_orb_subscription(ORB_ID(stm32_f3_cmd))),
+		_stm32_f3_time(0)
+	{}
+
+	bool send(const hrt_abstime t)
+	{
+		struct stm32_f3_cmd_s _stm32_f3_msg;
+
+		if (_sub->update(&_stm32_f3_time, &_stm32_f3_msg)) {
+			mavlink_stm32_f3_command_t _msg_stm32_f3 = {};
+			_msg_stm32_f3.command = _stm32_f3_msg.command;
+
+			strncpy(_msg_stm32_f3.f3_log, (const char *)_stm32_f3_msg.f3_log, sizeof(_msg_stm32_f3.f3_log));
+
+			_msg_stm32_f3.f3_log[sizeof(_msg_stm32_f3.f3_log) - 1] = '\0';
+
+			mavlink_msg_stm32_f3_command_send_struct(_mavlink->get_channel(), &_msg_stm32_f3);
+			return true;
+		}
+
+		return false;
+	}
+};
+
+class MavlinkStreamStm32F3CURR : public MavlinkStream
+{
+public:
+	const char *get_name() const
+	{
+		return MavlinkStreamStm32F3CURR::get_name_static();
+	}
+	static const char *get_name_static()
+	{
+		return "STM32F3_MOTOR_CURR";
+	}
+
+	static uint16_t get_id_static()
+	{
+		return MAVLINK_MSG_ID_STM32_F3_MOTOR_CURR;
+	}
+
+	uint16_t get_id()
+	{
+		return get_id_static();
+	}
+	static MavlinkStream *new_instance(Mavlink *mavlink)
+	{
+		return new MavlinkStreamStm32F3CURR(mavlink);
+	}
+	unsigned get_size()
+	{
+		return MAVLINK_MSG_ID_STM32_F3_MOTOR_CURR + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+	}
+
+private:
+	MavlinkOrbSubscription *_sub;
+	uint64_t _stm32_f3_time;
+
+	// do not allow top copying this class
+	MavlinkStreamStm32F3CURR(MavlinkStreamStm32F3CURR &);
+	MavlinkStreamStm32F3CURR &operator = (const MavlinkStreamStm32F3CURR &);
+
+protected:
+	explicit MavlinkStreamStm32F3CURR(Mavlink *mavlink) : MavlinkStream(mavlink),
+		_sub(_mavlink->add_orb_subscription(ORB_ID(stm32_f3_motor_curr))),
+		_stm32_f3_time(0)
+	{}
+
+	bool send(const hrt_abstime t)
+	{
+		struct stm32_f3_motor_curr_s _stm32_f3_msg;
+
+		if (_sub->update(&_stm32_f3_time, &_stm32_f3_msg)) {
+			mavlink_stm32_f3_motor_curr_t _msg_stm32_f3 = {};
+
+			memcpy(_msg_stm32_f3.motor_curr, _stm32_f3_msg.motor_curr, sizeof(_msg_stm32_f3.motor_curr));
+
+			mavlink_msg_stm32_f3_motor_curr_send_struct(_mavlink->get_channel(), &_msg_stm32_f3);
+			return true;
+		}
+
+		return false;
+	}
+};
+
 const StreamListItem *streams_list[] = {
 	new StreamListItem(&MavlinkStreamHeartbeat::new_instance, &MavlinkStreamHeartbeat::get_name_static, &MavlinkStreamHeartbeat::get_id_static),
 	new StreamListItem(&MavlinkStreamStatustext::new_instance, &MavlinkStreamStatustext::get_name_static, &MavlinkStreamStatustext::get_id_static),
@@ -4354,5 +4484,7 @@ const StreamListItem *streams_list[] = {
 	new StreamListItem(&MavlinkStreamMountOrientation::new_instance, &MavlinkStreamMountOrientation::get_name_static, &MavlinkStreamMountOrientation::get_id_static),
 	new StreamListItem(&MavlinkStreamHighLatency::new_instance, &MavlinkStreamHighLatency::get_name_static, &MavlinkStreamWind::get_id_static),
 	new StreamListItem(&MavlinkStreamGroundTruth::new_instance, &MavlinkStreamGroundTruth::get_name_static, &MavlinkStreamGroundTruth::get_id_static),
+	new StreamListItem(&MavlinkStreamStm32F3CMD::new_instance, &MavlinkStreamStm32F3CMD::get_name_static, &MavlinkStreamStm32F3CMD::get_id_static),
+	new StreamListItem(&MavlinkStreamStm32F3CURR::new_instance, &MavlinkStreamStm32F3CURR::get_name_static, &MavlinkStreamStm32F3CURR::get_id_static),
 	nullptr
 };

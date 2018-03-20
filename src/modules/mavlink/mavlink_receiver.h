@@ -79,6 +79,11 @@
 #include <uORB/topics/collision_report.h>
 #include <uORB/topics/cc_stm32_report.h>
 #include <uORB/topics/vehicle_command_ack.h>
+#include <uORB/topics/stm32_f3_cmd.h>
+#include <uORB/topics/stm32_f3_motor_curr.h>
+
+#include <v2.0/common/mavlink_msg_stm32_f3_command.h>
+#include <v2.0/common/mavlink_msg_stm32_f3_motor_curr.h>
 
 #include "mavlink_mission.h"
 #include "mavlink_parameters.h"
@@ -157,6 +162,8 @@ private:
 	void handle_message_serial_control(mavlink_message_t *msg);
 	void handle_message_logging_ack(mavlink_message_t *msg);
 	void handle_message_play_tune(mavlink_message_t *msg);
+	void handle_message_stm32_cmd(mavlink_message_t *msg);
+	void handle_message_stm32_motor_curr(mavlink_message_t *msg);
 	void handle_message_named_value_float(mavlink_message_t *msg);
 	void handle_message_debug(mavlink_message_t *msg);
 	void handle_message_debug_vect(mavlink_message_t *msg);
@@ -252,6 +259,8 @@ private:
 	orb_advert_t mavlink_log_pub;
 	orb_advert_t _companion_computer_pub;
 	orb_advert_t command_ack_pub;
+	orb_advert_t _stm32_cmd_pub;
+	orb_advert_t _stm32_motor_curr_pub;
 	int _control_mode_sub;
 	int _actuator_armed_sub;
 	uint64_t _global_ref_timestamp;

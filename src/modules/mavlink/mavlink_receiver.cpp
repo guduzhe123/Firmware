@@ -139,6 +139,8 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	mavlink_log_pub(nullptr),
 	_companion_computer_pub(nullptr),
 	command_ack_pub(nullptr),
+	_stm32_cmd_pub(nullptr),
+	_stm32_motor_curr_pub(nullptr),
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_actuator_armed_sub(orb_subscribe(ORB_ID(actuator_armed))),
 	_global_ref_timestamp(0),
@@ -334,6 +336,14 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 
 	case MAVLINK_MSG_ID_DEBUG_VECT:
 		handle_message_debug_vect(msg);
+		break;
+
+	case MAVLINK_MSG_ID_STM32_F3_COMMAND:
+		handle_message_stm32_cmd(msg);
+		break;
+
+	case MAVLINK_MSG_ID_STM32_F3_MOTOR_CURR:
+		handle_message_stm32_motor_curr(msg);
 		break;
 
 	default:
@@ -1462,6 +1472,51 @@ MavlinkReceiver::handle_message_play_tune(mavlink_message_t *msg)
 		}
 	}
 }
+
+void
+MavlinkReceiver::handle_message_stm32_cmd(mavlink_message_t *msg)
+{
+	mavlink_stm32_f3_command_t stm32_f3_msg;
+	mavlink_msg_stm32_f3_command_decode(msg, &stm32_f3_msg);
+	PX4_INFO("%d: %s", stm32_f3_msg.command, stm32_f3_msg.f3_log);
+
+	struct stm32_f3_cmd_s orb_msg;
+
+	orb_msg.command = stm32_f3_msg.command;
+
+	strcpy(orb_msg.f3_log, stm32_f3_msg.f3_log);
+
+	if (_stm32_cmd_pub == nullptr) {
+		_stm32_cmd_pub = orb_advertise(ORB_ID(stm32_f3_cmd), &orb_msg);
+
+	} else {
+		orb_publish(ORB_ID(stm32_f3_cmd), _stm32_cmd_pub, &orb_msg);
+	}
+
+}
+
+
+void
+MavlinkReceiver::handle_message_stm32_motor_curr(mavlink_message_t *msg)
+{
+	mavlink_stm32_f3_motor_curr_t stm32_f3_msg;
+	mavlink_msg_stm32_f3_motor_curr_decode(msg, &stm32_f3_msg);
+//	PX4_INFO("stm32_f3_msg.motor_curr = %.4f", (double)stm32_f3_msg.motor_curr[0]);
+
+	struct stm32_f3_motor_curr_s orb_msg;
+
+	memcpy(orb_msg.motor_curr, stm32_f3_msg.motor_curr, sizeof(orb_msg.motor_curr));
+
+
+	if (_stm32_motor_curr_pub == nullptr) {
+		_stm32_motor_curr_pub = orb_advertise(ORB_ID(stm32_f3_motor_curr), &orb_msg);
+
+	} else {
+		orb_publish(ORB_ID(stm32_f3_motor_curr), _stm32_motor_curr_pub, &orb_msg);
+	}
+
+}
+
 
 switch_pos_t
 MavlinkReceiver::decode_switch_pos(uint16_t buttons, unsigned sw)
