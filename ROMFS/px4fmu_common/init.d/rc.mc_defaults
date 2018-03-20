@@ -10,6 +10,7 @@ then
 	param set PWM_MIN 1075
 	param set PWM_MAX 1950
 	param set PWM_RATE 400
+	param set COM_ARM_IMU_ACC 0.8
 
 	param set RTL_LAND_DELAY 0
 fi
