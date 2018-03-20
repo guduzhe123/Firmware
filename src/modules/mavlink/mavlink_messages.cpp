@@ -540,7 +540,8 @@ private:
 	MavlinkOrbSubscription *_status_sub;
 	MavlinkOrbSubscription *_cpuload_sub;
 	MavlinkOrbSubscription *_battery_status_sub;
-
+	param_t _compainion_stm32_battery;
+	param_t _cc_stm32_enable;
 	/* do not allow top copying this class */
 	MavlinkStreamSysStatus(MavlinkStreamSysStatus &);
 	MavlinkStreamSysStatus &operator = (const MavlinkStreamSysStatus &);
@@ -549,7 +550,9 @@ protected:
 	explicit MavlinkStreamSysStatus(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
 		_cpuload_sub(_mavlink->add_orb_subscription(ORB_ID(cpuload))),
-		_battery_status_sub(_mavlink->add_orb_subscription(ORB_ID(battery_status)))
+		_battery_status_sub(_mavlink->add_orb_subscription(ORB_ID(battery_status))),
+		_compainion_stm32_battery(param_find("COM_CPT_BATTERY")),
+		_cc_stm32_enable(param_find("COM_COMPUTER"))
 	{}
 
 	bool send(const hrt_abstime t)
@@ -557,6 +560,11 @@ protected:
 		struct vehicle_status_s status = {};
 		struct cpuload_s cpuload = {};
 		struct battery_status_s battery_status = {};
+
+		int CC_STM32_Enable;
+		int Companion_STM32_Battery;
+		param_get(_compainion_stm32_battery, &Companion_STM32_Battery);
+		param_get(_cc_stm32_enable, &CC_STM32_Enable);
 
 		const bool updated_status = _status_sub->update(&status);
 		const bool updated_cpuload = _cpuload_sub->update(&cpuload);
@@ -584,7 +592,7 @@ protected:
 
 			/* battery status message with higher resolution */
 			mavlink_battery_status_t bat_msg = {};
-			bat_msg.id = 0;
+			bat_msg.id = battery_status.id;
 			bat_msg.battery_function = MAV_BATTERY_FUNCTION_ALL;
 			bat_msg.type = MAV_BATTERY_TYPE_LIPO;
 			bat_msg.current_consumed = (battery_status.connected) ? battery_status.discharged_mah : -1;
@@ -603,7 +611,6 @@ protected:
 			}
 
 			mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
-
 			return true;
 		}
 

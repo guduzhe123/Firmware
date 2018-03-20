@@ -753,8 +753,19 @@ PARAM_DEFINE_INT32(MIXER_SWITCH, 0);
 PARAM_DEFINE_INT32(COM_FLIGHT_UUID, 0);
 
 /**
- * Link between Commpanion computer and Pixhawk
- * 0 for discorrect, 1 for correct.
+ * Enable companion computer
  *
+ * Link between Commpanion computer and Pixhawk, 0 for discorrect, 1 for correct.
+ * @min 0
+ * @max 1
  */
-PARAM_DEFINE_INT32(COM_COMPUTER, 0);
+PARAM_DEFINE_INT32(CC_STM32, 0);
+
+/**
+ * Enable battery message from companion computer
+ *
+ *  0 for disable, 1 for enable.
+ * @min 0
+ * @max 1
+ */
+PARAM_DEFINE_INT32(CC_STM32_BATTERY, 0);

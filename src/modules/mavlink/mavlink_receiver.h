@@ -77,7 +77,7 @@
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/collision_report.h>
-#include <uORB/topics/companion_computer_report.h>
+#include <uORB/topics/cc_stm32_report.h>
 #include <uORB/topics/vehicle_command_ack.h>
 
 #include "mavlink_mission.h"
@@ -263,7 +263,7 @@ private:
 	struct offboard_control_mode_s _offboard_control_mode;
 	struct vehicle_attitude_setpoint_s _att_sp;
 	struct vehicle_rates_setpoint_s _rates_sp;
-	struct companion_computer_report_s  _f3_report;
+	struct cc_stm32_report_s  _stm32_report;
 	double _time_offset_avg_alpha;
 	int64_t _time_offset;
 	int	_orb_class_instance;

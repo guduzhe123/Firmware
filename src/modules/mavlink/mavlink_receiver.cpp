@@ -150,7 +150,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_offboard_control_mode{},
 	_att_sp{},
 	_rates_sp{},
-	_f3_report{},
+	_stm32_report{},
 	_time_offset_avg_alpha(0.8),
 	_time_offset(0),
 	_orb_class_instance(-1),
@@ -1348,22 +1348,19 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 	battery_status_s battery_status = {};
 	battery_status.timestamp = hrt_absolute_time();
 
+	for (int i = 0; i < 10; i ++) {
+		if (battery_mavlink.voltages[i] == 0) {
+			battery_mavlink.voltages[i] = UINT16_MAX;
+		}
+	}
+
 	float voltage_sum = 0.0f;
 	uint8_t cell_count = 0;
 
-	while (battery_mavlink.voltages[cell_count] < UINT16_MAX && cell_count < 10) {
+	while (battery_mavlink.voltages[cell_count] < UINT16_MAX  && cell_count < 10) {
 		voltage_sum += (float)(battery_mavlink.voltages[cell_count]) / 1000.0f;
 		cell_count++;
 	}
-
-	battery_status.voltage_v = voltage_sum;
-	battery_status.voltage_filtered_v  = voltage_sum;
-	battery_status.current_a = battery_status.current_filtered_a = (float)(battery_mavlink.current_battery) / 100.0f;
-	battery_status.current_filtered_a = battery_status.current_a;
-	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
-	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
-	battery_status.cell_count = cell_count;
-	battery_status.connected = true;
 
 	// Get the battery level thresholds.
 	float bat_emergen_thr;
@@ -1385,12 +1382,21 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 		battery_status.warning = battery_status_s::BATTERY_WARNING_LOW;
 	}
 
-	if (_battery_pub == nullptr) {
-		_battery_pub = orb_advertise(ORB_ID(battery_status), &battery_status);
+	battery_status.timestamp = hrt_absolute_time();
+	battery_status.voltage_v = voltage_sum;
 
-	} else {
-		orb_publish(ORB_ID(battery_status), _battery_pub, &battery_status);
-	}
+	battery_status.voltage_filtered_v  = voltage_sum;
+	battery_status.current_a = (float)(battery_mavlink.current_battery) ;
+	battery_status.current_filtered_a = battery_status.current_a;
+	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
+	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
+	battery_status.cell_count = cell_count;
+	battery_status.connected = true;
+	battery_status.id = battery_mavlink.id;
+
+
+	int instance;
+	orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &battery_status, &instance, ORB_PRIO_HIGH);
 }
 
 void
@@ -1668,14 +1674,14 @@ MavlinkReceiver::handle_message_heartbeat(mavlink_message_t *msg)
 
 		/* receive compainon computer heartbeat and report on the GCS */
 		case MAV_TYPE_ONBOARD_CONTROLLER:
-			_f3_report.time_f3 = 0;
-			_f3_report.onboard = true;
+			_stm32_report.time_stm32 = 0;
+			_stm32_report.onboard = true;
 
 			if (_companion_computer_pub == nullptr) {
-				_companion_computer_pub = orb_advertise(ORB_ID(companion_computer_report), &_f3_report);
+				_companion_computer_pub = orb_advertise(ORB_ID(cc_stm32_report), &_stm32_report);
 
 			} else {
-				orb_publish(ORB_ID(companion_computer_report), _companion_computer_pub, &_f3_report);
+				orb_publish(ORB_ID(cc_stm32_report), _companion_computer_pub, &_stm32_report);
 			}
 
 			break;

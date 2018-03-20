@@ -122,7 +122,8 @@
 #include <uORB/topics/vehicle_status_flags.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/estimator_status.h>
-#include <uORB/topics/companion_computer_report.h>
+#include <uORB/topics/vehicle_attitude_setpoint.h>
+#include <uORB/topics/cc_stm32_report.h>
 
 #include "../systemcmds/mixer/mixer.h"
 
@@ -272,9 +273,11 @@ static bool _last_condition_global_position_valid = false;
 
 static struct vehicle_land_detected_s land_detector = {};
 
-struct companion_computer_report_s  _f3_report = {};
+struct cc_stm32_report_s  _smt32_report = {};
 
-bool _f3_onboard_pre = false;
+bool _smt32_onboard_pre = false;
+
+int _Companion_STM32_Bat_Pre = 0;
 
 /**
  * The daemon app only briefly exists to start
@@ -700,11 +703,6 @@ int commander_main(int argc, char *argv[])
 		return 0;
 	}
 
-	/*if (!strcmp(argv[1], "test_mixer")) {
-        mixer_switch("/dev/pwm_output0", "ROMFS/px4fmu_common/mixers/quad_h.main.mix");
-		return 0;
-	}*/
-
 	usage("unrecognized command");
 	return 1;
 }
@@ -819,9 +817,6 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 	/* only handle commands that are meant to be handled by this system and component */
 	if (cmd->target_system != status_local->system_id || ((cmd->target_component != status_local->component_id)
 			&& (cmd->target_component != 0))) { // component_id 0: valid for all components
-		//PX4_INFO("target_system:%d, system_id:%d, target_component:%d, component_id:%d",
-				 //cmd->target_system, status_local->system_id, cmd->target_component, status_local->component_id);
-		//Notice landing gear target
 		return false;
 	}
 
@@ -1551,7 +1546,9 @@ int commander_thread_main(int argc, char *argv[])
 	/* failsafe response to loss of navigation accuracy */
 	param_t _param_posctl_nav_loss_act = param_find("COM_POSCTL_NAVL");
 
-    param_t _param_com_computer = param_find("COM_COMPUTER");
+    param_t _param_com_computer = param_find("CC_STM32");
+
+    param_t _compainion_stm32_battery = param_find("CC_STM32_BATTERY");
 
 	// These are too verbose, but we will retain them a little longer
 	// until we are sure we really don't need them.
@@ -1846,7 +1843,7 @@ int commander_thread_main(int argc, char *argv[])
 	memset(&system_power, 0, sizeof(system_power));
 
 	/* Subscribe companion computer report*/
-	int _companion_computer_sub = orb_subscribe(ORB_ID(companion_computer_report));
+	int _companion_computer_sub = orb_subscribe(ORB_ID(cc_stm32_report));
 
 	/* Subscribe to actuator controls (outputs) */
 	int actuator_controls_sub = orb_subscribe(ORB_ID_VEHICLE_ATTITUDE_CONTROLS);
@@ -2605,7 +2602,7 @@ int commander_thread_main(int argc, char *argv[])
 
 		if (updated) {
 			orb_copy(ORB_ID(battery_status), battery_sub, &battery);
-
+//            PX4_INFO("battery.voltage_filtered_v = %.4f", (double)battery.voltage_filtered_v);
 			/* only consider battery voltage if system has been running 6s (usb most likely detected) and battery voltage is valid */
 			if (hrt_absolute_time() > commander_boot_timestamp + 6000000
 			    && battery.voltage_filtered_v > 2.0f * FLT_EPSILON) {
@@ -3230,28 +3227,35 @@ int commander_thread_main(int argc, char *argv[])
 			}
 		}
 
-		/* Check if companion computer is OK when param Companion_Computer_Enable = 1*/
-        int Companion_Computer_Enable;
-        param_get(_param_com_computer,&Companion_Computer_Enable);
-        if (Companion_Computer_Enable){
+		/* Check if companion computer is OK when param compainion_stm32_enable = 1*/
+        int compainion_stm32_enable;
+        int Companion_STM32_Battery;
+        param_get(_param_com_computer,&compainion_stm32_enable);
+        param_get(_compainion_stm32_battery, &Companion_STM32_Battery);
+        if (compainion_stm32_enable){
             orb_check(_companion_computer_sub, &updated);
 
             if (updated) {
-                orb_copy(ORB_ID(companion_computer_report), _companion_computer_sub, &_f3_report);
+                orb_copy(ORB_ID(cc_stm32_report), _companion_computer_sub, &_smt32_report);
             }
-			/* massage from companion computer is 1Hz while commander's update frequence is 100Hz */
-            _f3_report.time_f3++;
-            if ( _f3_report.time_f3 / 100 == 2){
-                if ( _f3_report.time_f3 % 100 == 1){
-                    _f3_report.onboard = false;
-					mavlink_log_emergency(&mavlink_log_pub, " Companion Computer Lost!");
+			/* massage from companion computer STM32 is 1Hz while commander's update frequence is 100Hz */
+            _smt32_report.time_stm32++;
+            if ( _smt32_report.time_stm32 / 100 == 2){
+                if ( _smt32_report.time_stm32 % 100 == 1){
+                    _smt32_report.onboard = false;
+					mavlink_log_emergency(&mavlink_log_pub, "CC STM32 Is Lost!");
                 }
             }
 
-			if (_f3_report.onboard && _f3_report.onboard != _f3_onboard_pre){
-                mavlink_log_emergency(&mavlink_log_pub, " Companion Computer Is Onboard!");
+			if (_smt32_report.onboard && _smt32_report.onboard != _smt32_onboard_pre){
+                mavlink_log_emergency(&mavlink_log_pub, "CC STM32 Is Onboard!");
 			}
-            _f3_onboard_pre = _f3_report.onboard;
+            _smt32_onboard_pre = _smt32_report.onboard;
+
+            if (Companion_STM32_Battery != _Companion_STM32_Bat_Pre){
+				mavlink_log_critical(&mavlink_log_pub, "Reboot vehicle if CC_STM32_BATTERY changed");
+            }
+            _Companion_STM32_Bat_Pre = Companion_STM32_Battery;
         }
 
 		/* handle commands last, as the system needs to be updated to handle them */

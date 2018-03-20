@@ -166,6 +166,8 @@ private:
 	int		_diff_pres_sub{-1};			/**< raw differential pressure subscription */
 	int		_vcontrol_mode_sub{-1};		/**< vehicle control mode subscription */
 	int 		_params_sub{-1};			/**< notification of parameter updates */
+	param_t _compainion_stm32_battery;
+	param_t _compainion_stm32_enable;
 
 	orb_advert_t	_sensor_pub{nullptr};			/**< combined sensor data topic */
 	orb_advert_t	_battery_pub[BOARD_NUMBER_BRICKS] {};			/**< battery status */
@@ -234,6 +236,22 @@ private:
 
 Sensors::Sensors(bool hil_enabled) :
 	_hil_enabled(hil_enabled),
+	_armed(false),
+
+	_actuator_ctrl_0_sub(-1),
+	_diff_pres_sub(-1),
+	_vcontrol_mode_sub(-1),
+	_params_sub(-1),
+	_compainion_stm32_battery(param_find("CC_STM32_BATTERY")),
+	_compainion_stm32_enable(param_find("CC_STM32")),
+
+	/* publications */
+	_sensor_pub(nullptr),
+	_airspeed_pub(nullptr),
+	_diff_pres_pub(nullptr),
+	_sensor_preflight(nullptr),
+
+	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "sensors")),
 	_rc_update(_parameters),
 	_voted_sensors_update(_parameters, hil_enabled)
@@ -562,8 +580,17 @@ Sensors::adc_poll(struct sensor_combined_s &raw)
 									connected, selected_source == b, b,
 									ctrl.control[actuator_controls_s::INDEX_THROTTLE],
 									_armed,  &_battery_status[b]);
-					int instance;
-					orb_publish_auto(ORB_ID(battery_status), &_battery_pub[b], &_battery_status[b], &instance, ORB_PRIO_DEFAULT);
+
+					int Companion_Computer_Enable;
+					int Companion_STM32_Battery;
+					param_get(_compainion_stm32_battery, &Companion_STM32_Battery);
+					param_get(_compainion_stm32_enable, &Companion_Computer_Enable);
+
+					if (!Companion_Computer_Enable || !Companion_STM32_Battery) {
+						int instance;
+						orb_publish_auto(ORB_ID(battery_status), &_battery_pub[b], &_battery_status[b], &instance, ORB_PRIO_DEFAULT);
+
+					}
 				}
 			}
 
