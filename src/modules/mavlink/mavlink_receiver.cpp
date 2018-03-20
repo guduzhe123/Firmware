@@ -1403,7 +1403,9 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 	battery_status.cell_count = cell_count;
 	battery_status.connected = true;
 	battery_status.id = battery_mavlink.id;
-
+	battery_status.type = battery_mavlink.type;
+	battery_status.function = battery_mavlink.battery_function;
+	battery_status.temperature = battery_mavlink.temperature;
 
 	int instance;
 	orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &battery_status, &instance, ORB_PRIO_HIGH);

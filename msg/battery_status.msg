@@ -21,3 +21,6 @@ uint8 BATTERY_WARNING_FAILED = 4   # the battery has failed completely
 
 uint8 warning    # current battery warning
 uint8 id  # Battery ID
+uint8 type # Battery type
+uint8 function # Battery function
+float32 temperature # Battery temperature
