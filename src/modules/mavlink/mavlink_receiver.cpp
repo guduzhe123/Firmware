@@ -1380,6 +1380,21 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 	param_get(_p_bat_crit_thr, &bat_crit_thr);
 	param_get(_p_bat_low_thr, &bat_low_thr);
 
+	battery_status.timestamp = hrt_absolute_time();
+	battery_status.voltage_v = voltage_sum;
+
+	battery_status.voltage_filtered_v  = (float)(battery_mavlink.voltages[0]) / 1000.0f;
+	battery_status.current_a = (float)(battery_mavlink.current_battery);
+	battery_status.current_filtered_a = battery_status.current_a;
+	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
+	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
+	battery_status.cell_count = cell_count;
+	battery_status.connected = true;
+	battery_status.id = battery_mavlink.id;
+	battery_status.type = battery_mavlink.type;
+	battery_status.function = battery_mavlink.battery_function;
+	battery_status.temperature = battery_mavlink.temperature;
+
 	// Set the battery warning based on remaining charge.
 	//  Note: Smallest values must come first in evaluation.
 	if (battery_status.remaining < bat_emergen_thr) {
@@ -1391,21 +1406,6 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 	} else if (battery_status.remaining < bat_low_thr) {
 		battery_status.warning = battery_status_s::BATTERY_WARNING_LOW;
 	}
-
-	battery_status.timestamp = hrt_absolute_time();
-	battery_status.voltage_v = voltage_sum;
-
-	battery_status.voltage_filtered_v  = voltage_sum;
-	battery_status.current_a = (float)(battery_mavlink.current_battery) ;
-	battery_status.current_filtered_a = battery_status.current_a;
-	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
-	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
-	battery_status.cell_count = cell_count;
-	battery_status.connected = true;
-	battery_status.id = battery_mavlink.id;
-	battery_status.type = battery_mavlink.type;
-	battery_status.function = battery_mavlink.battery_function;
-	battery_status.temperature = battery_mavlink.temperature;
 
 	int instance;
 	orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &battery_status, &instance, ORB_PRIO_HIGH);
@@ -1480,7 +1480,8 @@ MavlinkReceiver::handle_message_stm32_cmd(mavlink_message_t *msg)
 {
 	mavlink_stm32_f3_command_t stm32_f3_msg;
 	mavlink_msg_stm32_f3_command_decode(msg, &stm32_f3_msg);
-	PX4_INFO("%d: %s", stm32_f3_msg.command, stm32_f3_msg.f3_log);
+
+	mavlink_log_critical(&mavlink_log_pub, "%d: %s", stm32_f3_msg.command, stm32_f3_msg.f3_log);
 
 	struct stm32_f3_cmd_s orb_msg;
 

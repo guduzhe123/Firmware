@@ -556,8 +556,8 @@ protected:
 		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
 		_cpuload_sub(_mavlink->add_orb_subscription(ORB_ID(cpuload))),
 		_battery_status_sub(_mavlink->add_orb_subscription(ORB_ID(battery_status))),
-		_compainion_stm32_battery(param_find("COM_CPT_BATTERY")),
-		_cc_stm32_enable(param_find("COM_COMPUTER"))
+		_compainion_stm32_battery(param_find("CC_STM32_BATTERY")),
+		_cc_stm32_enable(param_find("CC_STM32"))
 	{}
 
 	bool send(const hrt_abstime t)
@@ -582,9 +582,6 @@ protected:
 			msg.onboard_control_sensors_enabled = status.onboard_control_sensors_enabled;
 			msg.onboard_control_sensors_health = status.onboard_control_sensors_health;
 			msg.load = cpuload.load * 1000.0f;
-			msg.voltage_battery = (battery_status.connected) ? battery_status.voltage_filtered_v * 1000.0f : UINT16_MAX;
-			msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100.0f : -1;
-			msg.battery_remaining = (battery_status.connected) ? battery_status.remaining * 100.0f : -1;
 			// TODO: fill in something useful in the fields below
 			msg.drop_rate_comm = 0;
 			msg.errors_comm = 0;
@@ -593,18 +590,39 @@ protected:
 			msg.errors_count3 = 0;
 			msg.errors_count4 = 0;
 
-			mavlink_msg_sys_status_send_struct(_mavlink->get_channel(), &msg);
 
 			/* battery status message with higher resolution */
 			mavlink_battery_status_t bat_msg = {};
-			bat_msg.id = battery_status.id;
-			bat_msg.battery_function = battery_status.function;
-			bat_msg.type = battery_status.type;
-			bat_msg.current_consumed = (battery_status.connected) ? battery_status.discharged_mah : -1;
-			bat_msg.energy_consumed = -1;
-			bat_msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100 : -1;
-			bat_msg.battery_remaining = (battery_status.connected) ? battery_status.remaining * 100.0f : -1;
-			bat_msg.temperature = battery_status.temperature;
+
+			if (CC_STM32_Enable && Companion_STM32_Battery) {
+				bat_msg.id = battery_status.id;
+				bat_msg.battery_function = battery_status.function;
+				bat_msg.type = battery_status.type;
+				bat_msg.current_consumed = battery_status.discharged_mah;
+				bat_msg.energy_consumed = -1;
+				bat_msg.current_battery = battery_status.current_filtered_a;
+				bat_msg.battery_remaining = battery_status.remaining * 100.0f;
+				bat_msg.temperature = battery_status.temperature;
+
+				msg.voltage_battery = battery_status.voltage_filtered_v * 1000.0f;
+				msg.current_battery = battery_status.current_filtered_a;
+				msg.battery_remaining = battery_status.remaining * 100.0f;
+
+			} else {
+				bat_msg.id = -1;
+				bat_msg.battery_function = MAV_BATTERY_FUNCTION_ALL;
+				bat_msg.type = MAV_BATTERY_TYPE_LIPO;
+				bat_msg.current_consumed = (battery_status.connected) ? battery_status.discharged_mah : -1;
+				bat_msg.energy_consumed = -1;
+				bat_msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100 : -1;
+				bat_msg.battery_remaining = (battery_status.connected) ? battery_status.remaining * 100.0f : -1;
+				bat_msg.temperature = INT16_MAX;
+
+				msg.voltage_battery = (battery_status.connected) ? battery_status.voltage_filtered_v * 1000.0f : UINT16_MAX;
+				msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100.0f : -1;
+				msg.battery_remaining = (battery_status.connected) ? battery_status.remaining * 100.0f : -1;
+
+			}
 
 			for (unsigned int i = 0; i < (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0])); i++) {
 				if ((int)i < battery_status.cell_count && battery_status.connected) {
@@ -616,6 +634,8 @@ protected:
 			}
 
 			mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
+
+			mavlink_msg_sys_status_send_struct(_mavlink->get_channel(), &msg);
 			return true;
 		}
 
