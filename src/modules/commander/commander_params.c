@@ -741,6 +741,18 @@ PARAM_DEFINE_INT32(MOTOR_STOP_NUM, 3);
 PARAM_DEFINE_INT32(MIXER_SWITCH, 0);
 
 /**
+ * Motor Stop. Switch to one mixer
+ *
+ * @ 0, do not switch
+ * @ 1, switch to hexa tilted
+ * @ 2, switch to hexa dismotor 1
+ * @ 3, switch to hexa dismotor 2
+ * @ 4, switch to hexa dismotor 3
+ * @group Commander
+ */
+PARAM_DEFINE_INT32(MIXER_SWITCH_NUM, 0);
+
+/**
  * Next flight UUID
  *
  * This number is incremented automatically after every flight on

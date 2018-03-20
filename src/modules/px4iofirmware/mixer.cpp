@@ -514,10 +514,10 @@ mixer_handle_text_create_mixer()
 	}
 
 	/* do not allow a mixer change while safety off and FMU armed */
-	if ((r_status_flags & PX4IO_P_STATUS_FLAGS_SAFETY_OFF) &&
-	    (r_setup_arming & PX4IO_P_SETUP_ARMING_FMU_ARMED)) {
-		return 1;
-	}
+	/*	if ((r_status_flags & PX4IO_P_STATUS_FLAGS_SAFETY_OFF) &&
+		    (r_setup_arming & PX4IO_P_SETUP_ARMING_FMU_ARMED)) {
+			return 1;
+		}*/
 
 	/* abort if we're in the mixer - it will be tried again in the next iteration */
 	if (in_mixer) {
@@ -552,10 +552,10 @@ int
 mixer_handle_text(const void *buffer, size_t length)
 {
 	/* do not allow a mixer change while safety off and FMU armed */
-	if ((r_status_flags & PX4IO_P_STATUS_FLAGS_SAFETY_OFF) &&
-	    (r_setup_arming & PX4IO_P_SETUP_ARMING_FMU_ARMED)) {
-		return 1;
-	}
+	/*	if ((r_status_flags & PX4IO_P_STATUS_FLAGS_SAFETY_OFF) &&
+		    (r_setup_arming & PX4IO_P_SETUP_ARMING_FMU_ARMED)) {
+			return 1;
+		}*/
 
 	/* disable mixing, will be enabled once load is complete */
 	PX4_ATOMIC_MODIFY_CLEAR(r_status_flags, PX4IO_P_STATUS_FLAGS_MIXER_OK);

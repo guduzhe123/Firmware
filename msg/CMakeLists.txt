@@ -124,6 +124,7 @@ set(msg_files
 	cc_stm32_report.msg
 	stm32_f3_motor_curr.msg
 	stm32_f3_cmd.msg
+	mixer_switch.msg
 	)
 
 px4_add_git_submodule(TARGET git_gencpp PATH tools/gencpp)

@@ -80,8 +80,17 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/uORB.h>
+#include <math.h>
+#include <lib/mathlib/mathlib.h>
+#include <float.h>
+#include <uORB/topics/mixer_switch.h>
+#include <uORB/topics/mavlink_log.h>
+#include <systemlib/mavlink_log.h>
 
 #include <systemlib/err.h>
+
+static orb_advert_t mavlink_log_pub = nullptr;
 
 class PWMSim : public device::CDev
 {
@@ -119,6 +128,9 @@ private:
 	unsigned	_poll_fds_num;
 	int		_armed_sub;
 	int     _vstatus_sub;
+	int     actuator_controls_sub ;
+	int     _mixer_switch_sub;
+	int     _stop_num_pre;
 	orb_advert_t	_outputs_pub;
 	unsigned	_num_outputs;
 	bool		_primary_pwm_device;
@@ -138,7 +150,14 @@ private:
 
 	static void	task_main_trampoline(int argc, char *argv[]);
 	void		task_main();
+	void switch_mix(unsigned _rotor_count, float delta_out_max, float _thr_mdl_fac, float *outputs, int stop_num);
 
+	bool updated = false;
+	MultirotorMixer::saturation_status _saturation_status{};
+	struct actuator_controls_s _actuator_controls;
+	struct mixer_switch_s  _mixer_switch = {};
+
+	float 				*_outputs_prev = nullptr;
 	static int	control_callback(uintptr_t handle,
 					 uint8_t control_group,
 					 uint8_t control_index,
@@ -185,6 +204,9 @@ PWMSim::PWMSim() :
 	_poll_fds_num(0),
 	_armed_sub(-1),
 	_vstatus_sub(-1),
+	actuator_controls_sub(-1),
+	_mixer_switch_sub(-1),
+	_stop_num_pre(-1),
 	_outputs_pub(nullptr),
 	_num_outputs(0),
 	_primary_pwm_device(false),
@@ -369,6 +391,286 @@ PWMSim::subscribe()
 }
 
 void
+PWMSim::switch_mix(unsigned _rotor_count, float delta_out_max, float _thrust_factor, float *outputs_add, int stop_num)
+{
+	/*for (unsigned i = 0; i < actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS; i++) {
+	    if (_control_subs[i] > 0) {
+	        orb_copy(_control_topics[i], _control_subs[i], &_controls[i]);
+	//            PX4_INFO("count = %d", count);
+	    }
+	}*/
+	orb_check(actuator_controls_sub, &updated);
+
+	if (updated) {
+		/* got command */
+		orb_copy(ORB_ID_VEHICLE_ATTITUDE_CONTROLS, actuator_controls_sub, &_actuator_controls);
+	}
+
+//    PX4_INFO("roll = %.4f", (double)_actuator_controls.control[0]);
+
+	float		roll    = _actuator_controls.control[0];
+	float		pitch   = _actuator_controls.control[1];
+	float		yaw     = _actuator_controls.control[2];
+	float		thrust  = _actuator_controls.control[3];
+	float		min_out = 1.0f;
+	float		max_out = 0.0f;
+
+//    PX4_INFO("thrust = %.4f", (double)thrust);
+	/*mixers for hexarotor with one motor disabled.*/
+	// hexarotor tilted mixer, by zhou hua;
+	float hexa_tilted_data[6][4] = {	 -0.981584, -0.240501, -1.150884,  0.907673,
+						 0.918681,  0.255922,  1.150884,  0.907673,
+						 0.806960,  0.603947, -1.150884,  0.907673,
+						 -0.379265, -0.953788,  1.150884,  0.907673,
+						 -0.074945,  0.996971,  1.150884,  0.907673,
+						 0.747348, -0.442012, -1.150884,  0.907673
+				       };
+	math::Matrix<6, 4> hexa_tilt;
+	hexa_tilt.set(hexa_tilted_data);
+//
+	// hexarotor disable motor1, by 3 PHD.
+	float hexa_dismotor1_data[6][4] = {  0.000000,  0.000000,  0.000000,  0.000000,
+					     1.725300,  0.000000,  0.000000,  0.000000,
+					     0.431300,  0.747100,  0.000000,  1.000000,
+					     -0.431300, -0.747100,  0.000000,  1.000000,
+					     -0.431300,  0.747100,  0.000000,  1.000000,
+					     0.431300, -0.747100,  0.000000,  1.000000
+					  };
+	math::Matrix<6, 4> hexa_dismotor1;
+	hexa_dismotor1.set(hexa_dismotor1_data);
+//
+//    // hexarotor disable motor2, by 3 PHD.
+//    float hexa_dismotor2_data[6][4] = {	-1.725300,  0.000000,  0.000000,  0.000000 ,
+//                                         0.000000,  0.000000,  0.000000,  0.000000 ,
+//                                         0.431300,  0.747100,  0.000000,  1.200000 ,
+//                                        -0.431300, -0.747100,  0.000000,  1.200000 ,
+//                                        -0.431300,  0.747100,  0.000000,  1.200000 ,
+//                                         0.431300, -0.747100,  0.000000,  1.200000 };
+//    math::Matrix<6,4> hexa_dismotor2;
+//    hexa_dismotor2.set(hexa_dismotor2_data);
+//
+	// hexarotor disable motor3, by 3 PHD.
+//    float hexa_dismotor3_data[6][4] = {	-0.862700,  0.000000,  0.000000,  1.000000 ,
+//                                         0.862700,  0.000000,  0.000000,  1.000000 ,
+//                                         0.000000,  0.000000,  0.000000,  0.000000 ,
+//                                        -0.862700, -1.494200,  0.000000,  0.000000 ,
+//                                        -0.431300,  0.747100,  0.000000,  1.000000 ,
+//                                         0.431300, -0.747100,  0.000000,  1.000000 };
+//    math::Matrix<6,4> hexa_dismotor3;
+//    hexa_dismotor3.set(hexa_dismotor3_data);
+////
+////    // hexarotor disable motor4, by 3 PHD.
+//    float hexa_dismotor4_data[6][4] = {	   -0.862700,  0.000000,  0.000000,  1.200000 ,
+//                                            0.862700,  0.000000,  0.000000,  1.200000 ,
+//                                            0.862700,  1.494200,  0.000000,  0.000000 ,
+//                                            0.000000,  0.000000,  0.000000,  0.000000 ,
+//                                            -0.431300,  0.747100,  0.000000,  1.200000 ,
+//                                            0.431300, -0.747100,  0.000000,  1.200000 };
+//    math::Matrix<6,4> hexa_dismotor4;
+//    hexa_dismotor4.set(hexa_dismotor4_data);
+//
+	// hexarotor disable motor5, by 3 PHD.
+	/*    float hexa_dismotor5_data[6][4] = {	   -0.862700,  0.000000,  0.000000,  1.200000 ,
+	                                            0.862700,  0.000000,  0.000000,  1.200000 ,
+	                                            0.431300,  0.747100,  0.000000,  1.200000 ,
+	                                           -0.431300, -0.747100,  0.000000,  1.200000 ,
+	                                            0.000000,  0.000000,  0.000000,  0.000000 ,
+	                                            0.862700, -1.494200,  0.000000,  0.000000 };
+	    math::Matrix<6,4> hexa_dismotor5;
+	    hexa_dismotor5.set(hexa_dismotor5_data);
+	//
+	    // hexarotor disable motor6, by 3 PHD.
+	    float hexa_dismotor6_data[6][4] = {	 -0.862700,  0.000000,  0.000000,  1.200000 ,
+	                                          0.862700,  0.000000,  0.000000,  1.200000 ,
+	                                          0.431300,  0.747100,  0.000000,  1.200000 ,
+	                                         -0.431300, -0.747100,  0.000000,  1.200000 ,
+	                                          0.000000,  0.000000,  0.000000,  0.000000 ,
+	                                          0.862700, -1.494200,  0.000000,  0.000000 };
+	    math::Matrix<6,4> hexa_dismotor6;
+	    hexa_dismotor6.set(hexa_dismotor6_data);*/
+
+	// hexarotor x. test
+	float hexa_x_data[6][4] = {
+		-1.000000,  0.000000, -1.000000,  1.000000,
+		1.000000,  0.000000,  1.000000,  1.000000,
+		0.500000,  0.866025, -1.000000,  1.000000,
+		-0.500000, -0.866025,  1.000000,  1.000000,
+		-0.500000,  0.866025,  1.000000,  1.000000,
+		0.500000, -0.866025, -1.000000,  1.000000
+	};
+	math::Matrix<6, 4> hexa_x;
+	hexa_x.set(hexa_x_data);
+
+
+	// clean out class variable used to capture saturation
+	//    _saturation_status.value = 0;
+
+	math::Matrix<6, 4> hexa_switch;
+
+	if (stop_num == 1) {
+		// switch to hexa tilted
+		hexa_switch = hexa_tilt;
+
+		if (_stop_num_pre != stop_num) {
+			mavlink_log_critical(&mavlink_log_pub, "Switch to hexa tilt!");
+		}
+
+	} else if (stop_num == 2) {
+		// switch to hexa disable motor 1
+		hexa_switch = hexa_dismotor1;
+
+		if (_stop_num_pre != stop_num) {
+			mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor1!");
+		}
+	}
+
+	_stop_num_pre = stop_num;
+
+	// thrust boost parameters
+	float thrust_increase_factor = 1.5f;
+	float thrust_decrease_factor = 0.6f;
+
+	//perform initial mix pass yielding unbounded outputs, ignore yaw
+	float outputs[_rotor_count];
+//    memcpy(outputs, 0, sizeof(outputs));
+
+	for (unsigned i = 0; i < _rotor_count; i++) {
+		float out = roll * hexa_switch(i, 0) +
+			    pitch * hexa_switch(i, 1) +
+			    thrust;
+
+		out *= hexa_switch(i, 3);
+
+//         calculate min and max output values
+		if (out < min_out) {
+			min_out = out;
+		}
+
+		if (out > max_out) {
+			max_out = out;
+		}
+
+		outputs[i] = out;
+	}
+
+	float boost = 0.0f;		// value added to demanded thrust (can also be negative)
+	float roll_pitch_scale = 1.0f;	// scale for demanded roll and pitch
+
+	if (min_out < 0.0f && max_out < 1.0f && -min_out <= 1.0f - max_out) {
+		float max_thrust_diff = thrust * thrust_increase_factor - thrust;
+
+		if (max_thrust_diff >= -min_out) {
+			boost = -min_out;
+
+		} else {
+			boost = max_thrust_diff;
+			roll_pitch_scale = (thrust + boost) / (thrust - min_out);
+		}
+
+	} else if (max_out > 1.0f && min_out > 0.0f && min_out >= max_out - 1.0f) {
+		float max_thrust_diff = thrust - thrust_decrease_factor * thrust;
+
+		if (max_thrust_diff >= max_out - 1.0f) {
+			boost = -(max_out - 1.0f);
+
+		} else {
+			boost = -max_thrust_diff;
+			roll_pitch_scale = (1 - (thrust + boost)) / (max_out - thrust);
+		}
+
+	} else if (min_out < 0.0f && max_out < 1.0f && -min_out > 1.0f - max_out) {
+		float max_thrust_diff = thrust * thrust_increase_factor - thrust;
+		boost = math::constrain(-min_out - (1.0f - max_out) / 2.0f, 0.0f, max_thrust_diff);
+		roll_pitch_scale = (thrust + boost) / (thrust - min_out);
+
+	} else if (max_out > 1.0f && min_out > 0.0f && min_out < max_out - 1.0f) {
+		float max_thrust_diff = thrust - thrust_decrease_factor * thrust;
+		boost = math::constrain(-(max_out - 1.0f - min_out) / 2.0f, -max_thrust_diff, 0.0f);
+		roll_pitch_scale = (1 - (thrust + boost)) / (max_out - thrust);
+
+	} else if (min_out < 0.0f && max_out > 1.0f) {
+		boost = math::constrain(-(max_out - 1.0f + min_out) / 2.0f, thrust_decrease_factor * thrust - thrust,
+					thrust_increase_factor * thrust - thrust);
+		roll_pitch_scale = (thrust + boost) / (thrust - min_out);
+	}
+
+	// capture saturation
+	if (min_out < 0.0f) {
+		_saturation_status.flags.motor_neg = true;
+	}
+
+	if (max_out > 1.0f) {
+		_saturation_status.flags.motor_pos = true;
+	}
+
+	// Thrust reduction is used to reduce the collective thrust if we hit
+	// the upper throttle limit
+	float thrust_reduction = 0.0f;
+
+	// mix again but now with thrust boost, scale roll/pitch and also add yaw
+	for (unsigned i = 0; i < _rotor_count; i++) {
+		float out = (roll * hexa_switch(i, 0) +
+			     pitch * hexa_switch(i, 1)) * roll_pitch_scale +
+			    yaw * hexa_switch(i, 2) +
+			    thrust + boost;
+
+		out *= hexa_switch(i, 3);
+
+		// scale yaw if it violates limits. inform about yaw limit reached
+		if (out < 0.0f) {
+			if (fabsf(hexa_switch(i, 2)) <= FLT_EPSILON) {
+				yaw = 0.0f;
+
+			} else {
+				yaw = -((roll * hexa_switch(i, 0) + pitch * hexa_switch(i, 1)) *
+					roll_pitch_scale + thrust + boost) / hexa_switch(i, 2);
+			}
+
+		} else if (out > 1.0f) {
+			// allow to reduce thrust to get some yaw response
+			float prop_reduction = fminf(0.15f, out - 1.0f);
+			// keep the maximum requested reduction
+			thrust_reduction = fmaxf(thrust_reduction, prop_reduction);
+
+			if (fabsf(hexa_switch(i, 2)) <= FLT_EPSILON) {
+				yaw = 0.0f;
+
+			} else {
+				yaw = (1.0f - ((roll * hexa_switch(i, 0) + pitch * hexa_switch(i, 1)) *
+					       roll_pitch_scale + (thrust - thrust_reduction) + boost)) / hexa_switch(i, 2);
+			}
+		}
+	}
+
+	// Apply collective thrust reduction, the maximum for one prop
+	thrust -= thrust_reduction;
+
+	// add yaw and scale outputs to range idle_speed...1
+	for (unsigned i = 0; i < _rotor_count; i++) {
+		outputs[i] = (roll * hexa_switch(i, 0) +
+			      pitch * hexa_switch(i, 1)) * roll_pitch_scale +
+			     yaw * hexa_switch(i, 2) +
+			     thrust + boost;
+
+
+//            implement simple model for static relationship between applied motor pwm and motor thrust
+//            model: thrust = (1 - _thrust_factor) * PWM + _thrust_factor * PWM^2
+//            this model assumes normalized input / output in the range [0,1] so this is the right place
+//            to do it as at this stage the outputs are in that range.
+
+		if (_thrust_factor > 0.0f) {
+			outputs[i] = -(1.0f - _thrust_factor) / (2.0f * _thrust_factor) + sqrtf((1.0f - _thrust_factor) *
+					(1.0f - _thrust_factor) / (4.0f * _thrust_factor * _thrust_factor) + (outputs[i] < 0.0f ? 0.0f : outputs[i] /
+							_thrust_factor));
+		}
+
+		outputs[i] = math::constrain(-1.0f + (outputs[i] * 2.0f), -1.0f, 1.0f);
+		outputs_add[i] = outputs[i];
+	}
+
+}
+
+void
 PWMSim::task_main()
 {
 	/* force a reset of the update rate */
@@ -376,7 +678,8 @@ PWMSim::task_main()
 
 	_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
 	_vstatus_sub = orb_subscribe(ORB_ID(vehicle_status));
-
+	actuator_controls_sub = orb_subscribe(ORB_ID_VEHICLE_ATTITUDE_CONTROLS);
+	_mixer_switch_sub = orb_subscribe(ORB_ID(mixer_switch));
 	/* advertise the mixed control outputs */
 	actuator_outputs_s outputs = {};
 
@@ -476,11 +779,43 @@ PWMSim::task_main()
 				break;
 			}
 
+			orb_check(_mixer_switch_sub, &updated);
+
+			if (updated) {
+				orb_copy(ORB_ID(mixer_switch), _mixer_switch_sub, &_mixer_switch);
+			}
+
 			/* do mixing */
-			num_outputs = _mixers->mix(&outputs.output[0], num_outputs);
+			if (_mixer_switch.mixer_switch_enable &&  _mixer_switch.mixer_switch_num != 0) {
+				float outputs_add[6] = {};
+				switch_mix(6, 0.0f, 0.0f, &outputs_add[0], _mixer_switch.mixer_switch_num);
+
+				for (int i = 0; i < 6; i++) {
+					outputs.output[i] = outputs_add[i];
+				}
+
+			} else {
+				num_outputs = _mixers->mix(&outputs.output[0], num_outputs);
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					mavlink_log_critical(&mavlink_log_pub, "Using default hexa x mixer!");
+				}
+
+				_stop_num_pre = _mixer_switch.mixer_switch_num;
+			}
+
 			outputs.noutputs = num_outputs;
 			outputs.timestamp = hrt_absolute_time();
 
+			/*for (int i = 0; i < 6; i++){
+			    PX4_INFO("outputs.output[%d] = %.4f", i, (double)outputs.output[i]);
+			}*/
+
+//			PX4_INFO("outputs[1] = %.4f", (double)outputs.output[1]);
+//            PX4_INFO("outputs[2] = %.4f", (double)outputs.output[2]);
+//            PX4_INFO("outputs[3] = %.4f", (double)outputs.output[3]);
+//            PX4_INFO("outputs[4] = %.4f", (double)outputs.output[4]);
+//            PX4_INFO("outputs[5] = %.4f", (double)outputs.output[5]);
 			/* disable unused ports by setting their output to NaN */
 			for (size_t i = 0; i < sizeof(outputs.output) / sizeof(outputs.output[0]); i++) {
 				if (i >= num_outputs) {
@@ -573,7 +908,7 @@ PWMSim::task_main()
 		}
 
 		/* how about an arming update? */
-		bool updated;
+//		bool updated;
 		actuator_armed_s aa;
 		orb_check(_armed_sub, &updated);
 

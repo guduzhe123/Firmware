@@ -44,13 +44,15 @@ param set RTL_LAND_DELAY 0
 param set RTL_RETURN_ALT 30.0
 param set SENS_BOARD_ROT 0
 param set SENS_BOARD_X_OFF 0.000001
-param set SYS_AUTOSTART 6001
+param set SYS_AUTOSTART 6002
 param set SYS_MC_EST_GROUP 2
 param set SYS_RESTART_TYPE 2
 param set TRIG_INTERFACE 3
 param set TRIG_MODE 4
 param set MNT_MODE_IN 0
 param set MAV_PROTO_VER 2
+param set MIXER_SWITCH 1
+param set MOTOR_STOP_EN 1.0
 replay tryapplyparams
 simulator start -s
 tone_alarm start

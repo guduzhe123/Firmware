@@ -86,14 +86,19 @@
 #include <uORB/topics/servorail_status.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/multirotor_motor_limits.h>
-
 #include <debug.h>
-
 #include <modules/px4iofirmware/protocol.h>
-
 #include "uploader.h"
-
 #include "modules/dataman/dataman.h"
+
+#include <uORB/uORB.h>
+#include <math.h>
+#include <lib/mathlib/mathlib.h>
+#include <float.h>
+#include <uORB/topics/mixer_switch.h>
+#include <uORB/topics/mavlink_log.h>
+#include <systemlib/mavlink_log.h>
+#include <systemlib/pwm_limit/pwm_limit.h>
 
 #include "px4io_driver.h"
 
@@ -106,6 +111,7 @@
 #define ORB_CHECK_INTERVAL		200000		// 200 ms -> 5 Hz
 #define IO_POLL_INTERVAL		20000		// 20 ms -> 50 Hz
 
+static orb_advert_t mavlink_log_pub = nullptr;
 /**
  * The PX4IO class.
  *
@@ -265,6 +271,11 @@ private:
 	int			_t_vehicle_command;	///< vehicle command topic
 	int			_t_vehicle_status;///< vehicle status for motor stop
 
+	int     actuator_controls_sub ;
+	int     _mixer_switch_sub;
+	int     _stop_num_pre;
+//    const char buf ;
+
 	/* advertised topics */
 	orb_advert_t 		_to_input_rc;		///< rc inputs from io
 	orb_advert_t		_to_outputs;		///< mixed servo outputs topic
@@ -283,6 +294,12 @@ private:
 	bool			_cb_flighttermination;	///< true if the flight termination circuit breaker is enabled
 	bool 			_in_esc_calibration_mode;	///< do not send control outputs to IO (used for esc calibration)
 
+	bool updated = false;
+	MultirotorMixer::saturation_status _saturation_status{};
+	struct actuator_controls_s _actuator_controls = {};
+	struct mixer_switch_s  _mixer_switch = {};
+
+
 	int32_t			_rssi_pwm_chan; ///< RSSI PWM input channel
 	int32_t			_rssi_pwm_max; ///< max RSSI input on PWM channel
 	int32_t			_rssi_pwm_min; ///< min RSSI input on PWM channel
@@ -292,6 +309,10 @@ private:
 
 	bool			_test_fmu_fail; ///< To test what happens if IO looses FMU
 
+	int		_control_subs[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
+	actuator_controls_s _controls[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
+	orb_id_t	_control_topics[actuator_controls_s::NUM_ACTUATOR_CONTROL_GROUPS];
+	float 				*_outputs_prev = nullptr;
 	/**
 	 * Trampoline to the worker task
 	 */
@@ -489,6 +510,9 @@ PX4IO::PX4IO(device::Device *interface) :
 	_param_update_force(false),
 	_t_vehicle_command(-1),
 	_t_vehicle_status(-1),
+	actuator_controls_sub(-1),
+	_mixer_switch_sub(-1),
+	_stop_num_pre(-1),
 	_to_input_rc(nullptr),
 	_to_outputs(nullptr),
 	_to_servorail(nullptr),
@@ -709,7 +733,7 @@ PX4IO::init()
 		/* fill with initial values, clear updated flag */
 		struct actuator_armed_s safety;
 		uint64_t try_start_time = hrt_absolute_time();
-		bool updated = false;
+//		bool updated = false;
 
 		/* keep checking for an update, ensure we got a arming information,
 		   not something that was published a long time ago. */
@@ -905,6 +929,8 @@ PX4IO::task_main()
 	_t_param = orb_subscribe(ORB_ID(parameter_update));
 	_t_vehicle_command = orb_subscribe(ORB_ID(vehicle_command));
 	_t_vehicle_status = orb_subscribe(ORB_ID(vehicle_status));
+	_mixer_switch_sub = orb_subscribe(ORB_ID(mixer_switch));
+	actuator_controls_sub = orb_subscribe(ORB_ID_VEHICLE_ATTITUDE_CONTROLS);
 
 	if ((_t_actuator_controls_0 < 0) ||
 	    (_t_actuator_armed < 0) ||
@@ -986,7 +1012,7 @@ PX4IO::task_main()
 			io_publish_pwm_outputs();
 
 			/* check updates on uORB topics and handle it */
-			bool updated = false;
+//			bool updated = false;
 
 			/* arming state */
 			orb_check(_t_actuator_armed, &updated);
@@ -1025,6 +1051,89 @@ PX4IO::task_main()
 					motor_stop_num_prev = motor_stop_num;
 				}
 			}
+
+			orb_check(_mixer_switch_sub, &updated);
+
+			if (updated) {
+				orb_copy(ORB_ID(mixer_switch), _mixer_switch_sub, &_mixer_switch);
+			}
+
+			const char *buf ;
+
+			if (_mixer_switch.mixer_switch_num == 1) {
+				// switch to hexa tilted
+				buf = "R: 6ht 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa tilt!");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 2) {
+				// switch to hexa disable motor 1
+				buf = "R: 6xm1 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor1!");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 3) {
+				// switch to hexa disable motor 2
+				buf = "R: 6xm2 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor2");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 4) {
+				// switch to hexa disable motor 3
+				buf = "R: 6xm3 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor3!");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 5) {
+				// switch to hexa disable motor 4
+				buf = "R: 6xm4 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor4!");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 6) {
+				// switch to hexa disable motor 5
+				buf = "R: 6xm5 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor5!");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 7) {
+				// switch to hexa disable motor 4
+				buf = "R: 6xm6 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa dismotor6!");
+				}
+
+			} else if (_mixer_switch.mixer_switch_num == 8) {
+				// switch to hexa disable motor 4
+				buf = "R: 4x 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to quad x for test!");
+				}
+			}
+
+			_stop_num_pre = _mixer_switch.mixer_switch_num;
 		}
 
 		if (!_armed && (now >= orb_check_last + ORB_CHECK_INTERVAL)) {
@@ -1032,7 +1141,7 @@ PX4IO::task_main()
 			orb_check_last = now;
 
 			/* check updates on uORB topics and handle it */
-			bool updated = false;
+//			bool updated = false;
 
 			/* vehicle command */
 			orb_check(_t_vehicle_command, &updated);
@@ -1938,6 +2047,7 @@ PX4IO::io_publish_pwm_outputs()
 	int instance;
 	orb_publish_auto(ORB_ID(actuator_outputs), &_to_outputs, &outputs, &instance, ORB_PRIO_DEFAULT);
 
+//	int ret;
 	/* get mixer status flags from IO */
 	MultirotorMixer::saturation_status saturation_status;
 	ret = io_reg_get(PX4IO_PAGE_STATUS, PX4IO_P_STATUS_MIXER, &saturation_status.value, 1);

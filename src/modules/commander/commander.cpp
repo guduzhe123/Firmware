@@ -124,8 +124,10 @@
 #include <uORB/topics/estimator_status.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/cc_stm32_report.h>
+#include <uORB/topics/mixer_switch.h>
 
 #include "../systemcmds/mixer/mixer.h"
+#include <lib/mixer/mixer.h>
 
 typedef enum VEHICLE_MODE_FLAG
 {
@@ -201,9 +203,22 @@ static bool ccc_takeover_enable = false;
 
 /*motor stop params*/
 int32_t mixer_stop_using_qgc = 0;
-int32_t mixer_switch = 0;//NOTICE!!! use this may cause stack overload!!!
+int32_t mixer_switch = 0;
+
 const char *mixer_devname = "/dev/pwm_output0";
-const char *mixer_fname_1 = "ROMFS/px4fmu_common/mixers/quad_h.main.mix";
+ const char *mixer_hexa_disablemotor_1 = "ROMFS/px4fmu_common/mixers/hexa_disable_motor1.main.mix";
+ const char *mixer_hexa_disablemotor_2 = "ROMFS/px4fmu_common/mixers/hexa_disable_motor2.main.mix";
+ const char *mixer_hexa_disablemotor_3 = "ROMFS/px4fmu_common/mixers/hexa_disable_motor3.main.mix";
+ const char *mixer_hexa_disablemotor_4 = "ROMFS/px4fmu_common/mixers/hexa_disable_motor4.main.mix";
+ const char *mixer_hexa_disablemotor_5 = "ROMFS/px4fmu_common/mixers/hexa_disable_motor5.main.mix";
+ const char *mixer_hexa_disablemotor_6 = "ROMFS/px4fmu_common/mixers/hexa_disable_motor6.main.mix";
+
+/*const char *mixer_hexa_disablemotor_1 = "/etc/mixers/hexa_disable_motor1.main.mix";
+const char *mixer_hexa_disablemotor_2 = "/etc/mixers/hexa_disable_motor2.main.mix";
+const char *mixer_hexa_disablemotor_3 = "/etc/mixers/hexa_disable_motor3.main.mix";
+const char *mixer_hexa_disablemotor_4 = "/etc/mixers/hexa_disable_motor4.main.mix";
+const char *mixer_hexa_disablemotor_5 = "/etc/mixers/hexa_disable_motor5.main.mix";
+const char *mixer_hexa_disablemotor_6 = "/etc/mixers/hexa_disable_motor6.main.mix";*/
 
 static unsigned int leds_counter;
 /* To remember when last notification was sent */
@@ -279,6 +294,7 @@ bool _smt32_onboard_pre = false;
 
 int _Companion_STM32_Bat_Pre = 0;
 
+struct mixer_switch_s  _mixer_switch_report = {};
 /**
  * The daemon app only briefly exists to start
  * the background job. The stack size assigned in the
@@ -303,7 +319,7 @@ void usage(const char *reason);
 bool handle_command(struct vehicle_status_s *status, const struct safety_s *safety, struct vehicle_command_s *cmd,
 		    struct actuator_armed_s *armed, struct home_position_s *home, struct vehicle_global_position_s *global_pos,
 		    struct vehicle_local_position_s *local_pos, struct vehicle_attitude_s *attitude, orb_advert_t *home_pub,
-		    orb_advert_t *command_ack_pub, bool *changed);
+		    orb_advert_t *command_ack_pub, bool *changed, orb_advert_t *mixer_switch_pub);
 
 /**
  * Mainloop of commander.
@@ -812,7 +828,7 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 		    struct vehicle_command_s *cmd, struct actuator_armed_s *armed_local,
 		    struct home_position_s *home, struct vehicle_global_position_s *global_pos,
 		    struct vehicle_local_position_s *local_pos, struct vehicle_attitude_s *attitude, orb_advert_t *home_pub,
-		    orb_advert_t *command_ack_pub, bool *changed)
+		    orb_advert_t *command_ack_pub, bool *changed, orb_advert_t *mixer_switch_pub)
 {
 	/* only handle commands that are meant to be handled by this system and component */
 	if (cmd->target_system != status_local->system_id || ((cmd->target_component != status_local->component_id)
@@ -1315,6 +1331,7 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 		int motor_stop_enable =  (int)cmd->param1;
 		int motor_stop_num = (int)cmd->param2;
 		int motor_stop_pair = (int)cmd->param3;//0/1 all mean only 1, 2 means a pair
+        int mixer_switch_num = (int )cmd->param4;
 
 		if(motor_stop_enable){
 			if(motor_stop_pair >= 1){
@@ -1328,15 +1345,23 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
                 mavlink_log_critical(&mavlink_log_pub, "Stop M%d and M%d", (int)cmd->param2, motor_stop_num_oppo);
             }else{
                 mavlink_log_critical(&mavlink_log_pub, "Stop M%d", motor_stop_num);
-				if(mixer_switch){
-					do_mixer_switch(mixer_devname, mixer_fname_1);
-				}
             }
 		}else{
 			motor_stop_num = 0;
 			mavlink_log_critical(&mavlink_log_pub, "Restart Motor");
 		}
 
+		if(mixer_switch){
+            _mixer_switch_report.mixer_switch_enable = mixer_switch;
+            _mixer_switch_report.motor_stop_num = motor_stop_num;
+            _mixer_switch_report.mixer_switch_num = mixer_switch_num;
+
+			if (*mixer_switch_pub != nullptr) {
+				orb_publish(ORB_ID(mixer_switch), *mixer_switch_pub, &_mixer_switch_report);
+			} else {
+				*mixer_switch_pub = orb_advertise(ORB_ID(mixer_switch), &_mixer_switch_report);
+			}
+		}
         status.motor_stop_num = (uint32_t)motor_stop_num;
 
 		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
@@ -1515,7 +1540,8 @@ int commander_thread_main(int argc, char *argv[])
 	param_t _param_motor_stop_num = param_find("MOTOR_STOP_NUM");
 	param_t _param_motor_stop_enable = param_find("MOTOR_STOP_EN");
 	param_t _param_mixer_stop_using_qgc = param_find("MOTOR_STOP_QGC");
-	param_t _param_mixer_switch = param_find("MIXER_SWITCH");
+    param_t _param_mixer_switch = param_find("MIXER_SWITCH");
+    param_t _param_mixer_switch_num = param_find("MIXER_SWITCH_NUM");
 	param_t _param_low_bat_act = param_find("COM_LOW_BAT_ACT");
 	param_t _param_offboard_loss_timeout = param_find("COM_OF_LOSS_T");
 	param_t _param_arm_without_gps = param_find("COM_ARM_WO_GPS");
@@ -1693,6 +1719,7 @@ int commander_thread_main(int argc, char *argv[])
 	/* command ack */
 	orb_advert_t command_ack_pub = nullptr;
 
+    orb_advert_t mixer_switch_pub = nullptr;
 	/* init mission state, do it here to allow navigator to use stored mission even if mavlink failed to start */
 	mission_s mission;
 
@@ -2079,10 +2106,13 @@ int commander_thread_main(int argc, char *argv[])
             int32_t motor_stop_num_param = 0;
             int32_t motor_stop_num = 0;
             int32_t motor_stop_num_oppo = 0;
+            int    mixer_switch_num = 0;
 			param_get(_param_motor_stop_num, &motor_stop_num_param);
 			param_get(_param_motor_stop_enable, &motor_stop_enable);
 			param_get(_param_mixer_stop_using_qgc, &mixer_stop_using_qgc);
-			param_get(_param_mixer_switch, &mixer_switch);
+            param_get(_param_mixer_switch, &mixer_switch);
+            param_get(_param_mixer_switch_num, &mixer_switch_num);
+
 			int motor_stop_enable_int = (int)motor_stop_enable;
             static int motor_stop_enable_int_prev = 0;
 
@@ -2102,11 +2132,8 @@ int commander_thread_main(int argc, char *argv[])
                 }else{
                     motor_stop_num = motor_stop_num_param;
                     mavlink_log_critical(&mavlink_log_pub, "Stop M%d", motor_stop_num);
-					if(mixer_switch){
-						//mixer_switch("/dev/pwm_output0", "ROMFS/px4fmu_common/mixers/quad_h.main.mix");
-						do_mixer_switch(mixer_devname, mixer_fname_1);
-					}
                 }
+
 				//only deal with changed param
                 status.motor_stop_num = motor_stop_num;
 
@@ -2114,7 +2141,18 @@ int commander_thread_main(int argc, char *argv[])
 				//publish it immediately
 				status_changed = true;
             }
+			if(mixer_switch ) {
+				_mixer_switch_report.mixer_switch_enable = mixer_switch;
+				_mixer_switch_report.motor_stop_num = motor_stop_num;
+				_mixer_switch_report.mixer_switch_num = mixer_switch_num;
 
+				if (mixer_switch_pub != nullptr) {
+					orb_publish(ORB_ID(mixer_switch), mixer_switch_pub, &_mixer_switch_report);
+
+				} else {
+					mixer_switch_pub = orb_advertise(ORB_ID(mixer_switch), &_mixer_switch_report);
+				}
+			}
 			// If we update parameters the first time
 			// make sure the hysteresis time gets set.
 			// After that it will be set in the main state
@@ -2602,7 +2640,7 @@ int commander_thread_main(int argc, char *argv[])
 
 		if (updated) {
 			orb_copy(ORB_ID(battery_status), battery_sub, &battery);
-//            PX4_INFO("battery.voltage_filtered_v = %.4f", (double)battery.voltage_filtered_v);
+
 			/* only consider battery voltage if system has been running 6s (usb most likely detected) and battery voltage is valid */
 			if (hrt_absolute_time() > commander_boot_timestamp + 6000000
 			    && battery.voltage_filtered_v > 2.0f * FLT_EPSILON) {
@@ -3329,9 +3367,9 @@ int commander_thread_main(int argc, char *argv[])
 			/* got command */
 			orb_copy(ORB_ID(vehicle_command), cmd_sub, &cmd);
 
-			/* handle it */
+			/* handle it TO do handle */
 			if (handle_command(&status, &safety, &cmd, &armed, &_home, &global_position, &local_position,
-					&attitude, &home_pub, &command_ack_pub, &status_changed)) {
+					&attitude, &home_pub, &command_ack_pub, &status_changed, &mixer_switch_pub)) {
 				status_changed = true;
 			}
 		}
