@@ -2013,15 +2013,16 @@ Mavlink::task_main(int argc, char *argv[])
 		/* STATUSTEXT stream is like normal stream but gets messages from logbuffer instead of uORB */
 		configure_stream("STATUSTEXT", 20.0f);
 
-		/* COMMAND_LONG stream: use unlimited rate to send all commands */
-		configure_stream("COMMAND_LONG");//already forward here!!!
+		/* COMMAND_LONG stream: use high rate to avoid commands skipping */
+		configure_stream("COMMAND_LONG", 100.0f);
+		configure_stream("PID_AUTO_TUNE", 10.0f);
 
 	}
 
 	switch (_mode) {
 	case MAVLINK_MODE_NORMAL:
 #if CT_PID_TUNING
-		configure_stream("ATTITUDE", 10.0f);//10Hz
+		configure_stream("ATTITUDE", 50.0f);//10Hz
 		configure_stream("ATTITUDE_TARGET", 10.0f);//10Hz
 #else
 		configure_stream("ATTITUDE", 20.0f);
@@ -2053,6 +2054,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("WIND_COV", 1.0f);
 		configure_stream("CAMERA_IMAGE_CAPTURED");
 		configure_stream("STM32F3_CMD", 5.0f);
+		configure_stream("PID_AUTO_TUNE", 10.0f);
 		break;
 
 	case MAVLINK_MODE_ONBOARD:
@@ -2090,6 +2092,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("CAMERA_IMAGE_CAPTURED");
 		configure_stream("ACTUATOR_CONTROL_TARGET0", 10.0f);
 		configure_stream("STM32F3_CMD", 5.0f);
+		configure_stream("PID_AUTO_TUNE", 10.0f);
 		break;
 
 	case MAVLINK_MODE_OSD:
@@ -2108,6 +2111,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("WIND_COV", 2.0f);
 		configure_stream("SYSTEM_TIME", 1.0f);
 		configure_stream("STM32F3_CMD", 5.0f);
+		configure_stream("PID_AUTO_TUNE", 10.0f);
 		break;
 
 	case MAVLINK_MODE_MAGIC:
@@ -2150,6 +2154,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("ACTUATOR_CONTROL_TARGET0", 30.0f);
 		configure_stream("MANUAL_CONTROL", 5.0f);
 		configure_stream("STM32F3_CMD", 5.0f);
+		configure_stream("PID_AUTO_TUNE", 10.0f);
 		break;
 
 	case MAVLINK_MODE_IRIDIUM:

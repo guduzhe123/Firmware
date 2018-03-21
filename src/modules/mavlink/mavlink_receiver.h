@@ -84,6 +84,7 @@
 
 #include <v2.0/common/mavlink_msg_stm32_f3_command.h>
 #include <v2.0/common/mavlink_msg_stm32_f3_motor_curr.h>
+#include <v2.0/common/mavlink_msg_pid_auto_tune.h>
 
 #include "mavlink_mission.h"
 #include "mavlink_parameters.h"
@@ -167,6 +168,7 @@ private:
 	void handle_message_named_value_float(mavlink_message_t *msg);
 	void handle_message_debug(mavlink_message_t *msg);
 	void handle_message_debug_vect(mavlink_message_t *msg);
+	void handle_message_pid_auto_tune(mavlink_message_t *msg);
 
 	void *receive_thread(void *arg);
 
@@ -261,6 +263,7 @@ private:
 	orb_advert_t command_ack_pub;
 	orb_advert_t _stm32_cmd_pub;
 	orb_advert_t _stm32_motor_curr_pub;
+	orb_advert_t _pid_auto_tune_pub;
 	int _control_mode_sub;
 	int _actuator_armed_sub;
 	uint64_t _global_ref_timestamp;

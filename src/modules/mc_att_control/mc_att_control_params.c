@@ -554,3 +554,50 @@ PARAM_DEFINE_FLOAT(MC_TPA_RATE_I, 0.0f);
  * @group Multicopter Attitude Control
  */
 PARAM_DEFINE_FLOAT(MC_TPA_RATE_D, 0.0f);
+
+/**
+ * PID autotune
+ *
+ * 0 for disable this function, 1 for enable
+ *
+ * @min 0
+ * @max 1
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_PID_AUTOTUNE, 0);
+
+/**
+ * PID autotune axis
+ *
+ * 1 and 2 for roll , 3 and 4 for pitch, 5 and 6 for yaw.
+ * 0 disable tuning.
+ *
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_PID_AXIS, 0);
+
+/**
+ * PID autotune roll pitch angle setpoint
+ *
+ * 0 ~ 2*pi degree
+ *
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_PID_ANGLE_RP, 5);
+
+/**
+ * PID autotune yaw angle setpoint
+ *
+ * 0 ~ 2*pi degree
+ *
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_PID_ANGLE_Y, 180);
+
+/**
+ * PID autotune time
+ *
+ *
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_PID_TIME, 2000);

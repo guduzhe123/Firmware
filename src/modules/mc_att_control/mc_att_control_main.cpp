@@ -68,6 +68,7 @@
 #include <systemlib/param/param.h>
 #include <systemlib/perf_counter.h>
 #include <systemlib/systemlib.h>
+#include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/manual_control_setpoint.h>
@@ -82,7 +83,9 @@
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/pid_auto_tune.h>
 #include <uORB/uORB.h>
+#include <systemlib/mavlink_log.h>
 
 /**
  * Multicopter attitude control app start / stop handling function
@@ -101,6 +104,10 @@ extern "C" __EXPORT int mc_att_control_main(int argc, char *argv[]);
 #define AXIS_COUNT 3
 
 #define MAX_GYRO_COUNT 3
+
+#define PID_TUNE_START_TIME 500
+
+static orb_advert_t mavlink_log_pub = nullptr;
 
 class MulticopterAttitudeControl
 {
@@ -143,9 +150,14 @@ private:
 	unsigned _gyro_count;
 	int _selected_gyro;
 
+	uint16_t _time;     /* calculate time one motion needed    */
+	uint16_t _time_reached;    /*calculate time when real attitude reachs to att_sp  */
+	uint16_t _time_overshot;   /*calculate time when real attitude at its max value   */
+
 	orb_advert_t	_v_rates_sp_pub;		/**< rate setpoint publication */
 	orb_advert_t	_actuators_0_pub;		/**< attitude actuator controls publication */
 	orb_advert_t	_controller_status_pub;	/**< controller status publication */
+	orb_advert_t    _pid_tune_pub;         /* PID tuning publication  */
 
 	orb_id_t _rates_sp_id;	/**< pointer to correct rates setpoint uORB metadata structure */
 	orb_id_t _actuators_id;	/**< pointer to correct actuator controls0 uORB metadata structure */
@@ -164,7 +176,7 @@ private:
 	struct sensor_gyro_s			_sensor_gyro;		/**< gyro data before thermal correctons and ekf bias estimates are applied */
 	struct sensor_correction_s		_sensor_correction;	/**< sensor thermal corrections */
 	struct sensor_bias_s			_sensor_bias;		/**< sensor in-run bias corrections */
-
+	struct pid_auto_tune_s          _pid_tune;          /*PID tuning data   */
 	MultirotorMixer::saturation_status _saturation_status{};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
@@ -180,6 +192,42 @@ private:
 	math::Matrix<3, 3>  _I;				/**< identity matrix */
 
 	math::Matrix<3, 3>	_board_rotation = {};	/**< rotation matrix for the orientation that the board is mounted */
+	math::Vector<3> _e_ang ;             /* error of angle */
+	math::Vector<3> _e_rate ;            /* error of angle rate */
+	math::Vector<3> _euler_angles;       /* euler angles of real */
+	math::Vector<3> _euler_angles_sp;    /* euler angles setpoint */
+	float _j_pid_tune;                   /* PID profermance judgement */
+	float _ang_pre;                      /* angle of previous circle  */
+	float _ang_act;                      /* angle of this circle */
+	float _ang_max;                      /* max angle of real euler angle at one motion */
+	float _ang_sum;                      /* sum value of real euler angle */
+	math::Matrix<3, 3> _R_sp_pid_tune;   /* rotation matrix of angle_sp */
+	math::Matrix<3, 3> _R_pid_tune;      /* rotation maxtrix of angle */
+	float _roll_sp_pid;                  /* roll_sp */
+	float _pitch_sp_pid;                 /* pitch_sp */
+	float _yaw_sp_pid;                   /* yaw_sp  */
+	float _control_input;                /* control input and energy */
+	float _e_euler_ang;                  /* the needed error of euler angle when pid tuning begin*/
+	float _e_euler_rate;                 /* the needed error of euler angle rate when pid tuning begin*/
+	float _euler_angles_input;           /* the needed angle */
+	float _angle_sp;                     /* the needed angle_sp */
+	int w1 ;
+	int w2 ;
+	int w3 ;
+	int w4 ;
+	float w5 ;
+
+	enum PID_STATE {
+		TUNE_NONE = 0,   /* don't tune */
+		TUNE_ROLL_P,     /* tune roll at positive direction */
+		TUNE_ROLL_N,     /* tune roll at negative direction*/
+		TUNE_PITCH_P,
+		TUNE_PITCH_N,
+		TUNE_YAW_CW,
+		TUNE_YAW_CCW,
+	} _pid_tune_state;   /* which axis will be used for pid tuning */
+
+	int pid_tune_stop;
 
 	struct {
 		param_t roll_p;
@@ -231,6 +279,11 @@ private:
 		param_t board_rotation;
 
 		param_t board_offset[3];
+		param_t mc_pid_autotune;
+		param_t mc_pid_axis;
+		param_t mc_pid_angle_rp;
+		param_t mc_pid_angle_y;
+		param_t mc_pid_time;
 
 	}		_params_handles;		/**< handles for interesting parameters */
 
@@ -270,6 +323,12 @@ private:
 		int32_t board_rotation;
 
 		float board_offset[3];
+
+		int mc_pid_autotune;
+		int mc_pid_axis;
+		float mc_pid_angle_rp;
+		float mc_pid_angle_y;
+		int mc_pid_time;
 
 	}		_params;
 
@@ -319,6 +378,15 @@ private:
 	 * Main attitude control task.
 	 */
 	void		task_main();
+
+	/* add PID justice function*/
+	void       pid_justice(float control_u, float e_ang, float e_rate, float euler_angles, float angle_sp);
+
+	/* do action while pid tuning */
+	void       pid_tune_on_action();
+
+	/* move to next action item*/
+	void       pid_tune_advance_action();
 };
 
 namespace mc_att_control
@@ -347,11 +415,15 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	/* gyro selection */
 	_gyro_count(1),
 	_selected_gyro(0),
+	_time(0),
+	_time_reached(0),
+	_time_overshot(0),
 
 	/* publications */
 	_v_rates_sp_pub(nullptr),
 	_actuators_0_pub(nullptr),
 	_controller_status_pub(nullptr),
+	_pid_tune_pub(nullptr),
 	_rates_sp_id(nullptr),
 	_actuators_id(nullptr),
 
@@ -369,6 +441,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_sensor_gyro{},
 	_sensor_correction{},
 	_sensor_bias{},
+	_pid_tune{},
 	_saturation_status{},
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "mc_att_control")),
@@ -403,6 +476,8 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params.board_offset[1] = 0.0f;
 	_params.board_offset[2] = 0.0f;
 
+	_params.mc_pid_autotune = 0;
+
 	_rates_prev.zero();
 	_rates_sp.zero();
 	_rates_sp_prev.zero();
@@ -412,6 +487,32 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 
 	_I.identity();
 	_board_rotation.identity();
+	_e_ang.zero();
+	_e_rate.zero();
+	_euler_angles.zero();
+	_euler_angles_sp.zero();
+	_j_pid_tune = 0.0f;
+	_ang_pre = 0.0f;
+	_ang_act = 0.0f;
+	_ang_max = 0.0f;
+	_ang_sum = 0.0f;
+	_R_sp_pid_tune.zero();
+	_R_pid_tune.zero();
+	_roll_sp_pid = 0.0f;
+	_pitch_sp_pid = 0.0f;
+	_yaw_sp_pid = 0.0f;
+	_control_input = 0.0f;
+	_e_euler_ang = 0.0f;
+	_e_euler_rate = 0.0f;
+	_euler_angles_input = 0.0f;
+	_angle_sp = 0.0f;
+	w1 = 1;
+	w2 = 10;
+	w3 = 10;
+	w4 = 10;
+	w5 = 0.05;
+	pid_tune_stop = 0;
+
 
 	_params_handles.roll_p			= 	param_find("MC_ROLL_P");
 	_params_handles.roll_rate_p		= 	param_find("MC_ROLLRATE_P");
@@ -468,8 +569,42 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params_handles.board_offset[1]		=	param_find("SENS_BOARD_Y_OFF");
 	_params_handles.board_offset[2]		=	param_find("SENS_BOARD_Z_OFF");
 
+	_params_handles.mc_pid_autotune = param_find("MC_PID_AUTOTUNE");
+	_params_handles.mc_pid_axis = param_find("MC_PID_AXIS");
+	_params_handles.mc_pid_angle_rp = param_find("MC_PID_ANGLE_RP");
+	_params_handles.mc_pid_angle_y = param_find("MC_PID_ANGLE_Y");
+	_params_handles.mc_pid_time = param_find("MC_PID_TIME");
+
 	/* fetch initial parameter values */
 	parameters_update();
+
+	/* define which axis in needed for pid tuning at the beginning*/
+	if (_params.mc_pid_axis == 0) {
+		_pid_tune_state = TUNE_NONE;
+
+	} else if (_params.mc_pid_axis == 1) {
+		_pid_tune_state = TUNE_ROLL_P;
+
+	} else if (_params.mc_pid_axis == 2) {
+		_pid_tune_state = TUNE_ROLL_N;
+
+	} else if (_params.mc_pid_axis == 3) {
+		_pid_tune_state = TUNE_PITCH_P;
+
+	} else if (_params.mc_pid_axis == 4) {
+		_pid_tune_state = TUNE_PITCH_N;
+
+	} else if (_params.mc_pid_axis == 5) {
+		_pid_tune_state = TUNE_YAW_CCW;
+
+	} else if (_params.mc_pid_axis == 6) {
+		_pid_tune_state = TUNE_YAW_CW;
+	}
+
+	if (_params.vtol_type == 0 && _params.vtol_opt_recovery_enabled) {
+		// the vehicle is a tailsitter, use optimal recovery control strategy
+		_ts_opt_recovery = new TailsitterRecovery();
+	}
 
 	/* initialize thermal corrections as we might not immediately get a topic update (only non-zero values) */
 	for (unsigned i = 0; i < 3; i++) {
@@ -631,6 +766,11 @@ MulticopterAttitudeControl::parameters_update()
 					 M_DEG_TO_RAD_F * _params.board_offset[1],
 					 M_DEG_TO_RAD_F * _params.board_offset[2]);
 	_board_rotation = board_rotation_offset * _board_rotation;
+	param_get(_params_handles.mc_pid_autotune, &(_params.mc_pid_autotune));
+	param_get(_params_handles.mc_pid_axis, &(_params.mc_pid_axis));
+	param_get(_params_handles.mc_pid_angle_rp, &(_params.mc_pid_angle_rp));
+	param_get(_params_handles.mc_pid_angle_y, &(_params.mc_pid_angle_y));
+	param_get(_params_handles.mc_pid_time, &(_params.mc_pid_time));
 }
 
 void
@@ -802,6 +942,330 @@ MulticopterAttitudeControl::sensor_bias_poll()
 
 }
 
+void
+MulticopterAttitudeControl::pid_tune_advance_action()
+{
+	/* check which axis is needed for pid tuning and init some value*/
+	switch (_pid_tune_state) {
+	case TUNE_NONE:
+		if (pid_tune_stop) {
+			_time = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			pid_tune_stop = 0;
+			_j_pid_tune = 0.0f;
+			_params.mc_pid_autotune = 0;
+			_ang_sum = 0.0f;
+
+		}
+
+		break;
+
+	case TUNE_ROLL_P:
+		if (pid_tune_stop) {
+			_pid_tune_state = TUNE_ROLL_N;
+			_time = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			pid_tune_stop = 0;
+			_j_pid_tune = 0.0f;
+			_ang_sum = 0.0f;
+
+		}
+
+		break;
+
+	case TUNE_ROLL_N:
+		if (pid_tune_stop) {
+			_pid_tune_state = TUNE_ROLL_P;
+			_time = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			pid_tune_stop = 0;
+			_j_pid_tune = 0.0f;
+			_ang_sum = 0.0f;
+
+		}
+
+		break;
+
+	case TUNE_PITCH_P:
+		if (pid_tune_stop) {
+			_pid_tune_state = TUNE_PITCH_N;
+			_time = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			pid_tune_stop = 0;
+			_j_pid_tune = 0.0f;
+			_ang_sum = 0.0f;
+
+		}
+
+		break;
+
+	case TUNE_PITCH_N:
+		if (pid_tune_stop) {
+			_pid_tune_state = TUNE_PITCH_P;
+			_time = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			pid_tune_stop = 0;
+			_j_pid_tune = 0.0f;
+			_ang_sum = 0.0f;
+
+		}
+
+		break;
+
+	case TUNE_YAW_CW:
+		if (pid_tune_stop) {
+			_pid_tune_state = TUNE_YAW_CCW;
+			_time = 0;
+			pid_tune_stop = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			_j_pid_tune = 0.0f;
+			_ang_sum = 0.0f;
+
+		}
+
+		break;
+
+	case TUNE_YAW_CCW:
+		if (pid_tune_stop) {
+			_pid_tune_state = TUNE_YAW_CW;
+			_time = 0;
+			pid_tune_stop = 0;
+			_time_reached = 0;
+			_time_overshot = 0;
+			_j_pid_tune = 0.0f;
+			_ang_sum = 0.0f;
+		}
+
+		break;
+
+	default:
+		break;
+	}
+}
+
+void
+MulticopterAttitudeControl::pid_tune_on_action()
+{
+	switch (_pid_tune_state) {
+	case TUNE_NONE:
+		pid_tune_stop = 1;
+		break;
+
+	case TUNE_ROLL_N:
+	case TUNE_ROLL_P:
+		_time++;
+
+		/* begin tuning*/
+		if (_time == PID_TUNE_START_TIME) {
+			mavlink_log_critical(&mavlink_log_pub, "tune roll start");
+		}
+
+		if (_time > PID_TUNE_START_TIME) {
+			// give attitude setpoint.
+			if (_pid_tune_state == TUNE_ROLL_P) {
+				_roll_sp_pid = _params.mc_pid_angle_rp * 3.14f / 180.0f;
+
+			} else {
+				_roll_sp_pid = -_params.mc_pid_angle_rp * 3.14f / 180.0f;
+			}
+
+			_pitch_sp_pid = _euler_angles_sp(1);
+			_yaw_sp_pid = _euler_angles_sp(2);
+
+			_e_euler_ang = _e_ang(0);
+			_e_euler_rate = _e_rate(0);
+			_euler_angles_input = _euler_angles(0);
+			_control_input = _actuators.control[0] * _actuators.control[0];
+			_angle_sp = _roll_sp_pid;
+		}
+
+		break;
+
+	case TUNE_PITCH_P:
+	case TUNE_PITCH_N:
+		_time++;
+
+		if (_time == PID_TUNE_START_TIME) {
+			mavlink_log_critical(&mavlink_log_pub, "tune pitch start");
+		}
+
+		if (_time > PID_TUNE_START_TIME) {
+			_roll_sp_pid = _euler_angles_sp(0);
+
+			if (_pid_tune_state == TUNE_PITCH_P) {
+				_pitch_sp_pid = _params.mc_pid_angle_rp * 3.14f / 180.0f;
+
+			} else {
+				_pitch_sp_pid = -_params.mc_pid_angle_rp * 3.14f / 180.0f;
+			}
+
+			_yaw_sp_pid = _euler_angles_sp(2);
+
+			_e_euler_ang = _e_ang(1);
+			_e_euler_rate = _e_rate(1);
+			_euler_angles_input = _euler_angles(1);
+			_control_input = _actuators.control[1] * _actuators.control[1];
+			_angle_sp = _pitch_sp_pid;
+		}
+
+		break;
+
+	case TUNE_YAW_CW:
+	case TUNE_YAW_CCW:
+		_time++;
+
+		if (_time == PID_TUNE_START_TIME) {
+			mavlink_log_critical(&mavlink_log_pub, "tune yaw start");
+		}
+
+		if (_time > PID_TUNE_START_TIME) {
+			_roll_sp_pid = _euler_angles_sp(0);
+			_pitch_sp_pid = _euler_angles_sp(1);
+
+			if (_pid_tune_state == TUNE_YAW_CW) {
+				_yaw_sp_pid = _params.mc_pid_angle_y * 3.14f / 180.0f;
+
+			} else {
+				_yaw_sp_pid = _params.mc_pid_angle_y * 3.14f / 180.0f;
+			}
+
+			_e_euler_ang = _e_ang(2);
+			_e_euler_rate = _e_rate(2);
+			_euler_angles_input = _euler_angles(2);
+			_control_input = _actuators.control[2] * _actuators.control[2];
+			_angle_sp = _yaw_sp_pid;
+		}
+
+		break;
+
+	}
+
+	if (_time > PID_TUNE_START_TIME) {
+		_R_sp_pid_tune.from_euler(_roll_sp_pid, _pitch_sp_pid, _yaw_sp_pid);
+
+		// calculate PID performance value.
+		pid_justice(_control_input, _e_euler_ang, _e_euler_rate, _euler_angles_input, _angle_sp);
+	}
+
+	if (_time > _params.mc_pid_time) {
+		pid_tune_stop = 1;
+	}
+}
+
+void
+MulticopterAttitudeControl::pid_justice(float control_u, float e_ang, float e_rate, float euler_angles, float angle_sp)
+{
+	if (_time > _params.mc_pid_time) {
+		return;
+	}
+
+	_ang_act = euler_angles;
+	float error_ang_bet;
+	error_ang_bet = _ang_act - _ang_pre;
+
+	_j_pid_tune += w1 * fabsf(e_rate) + w2 * fabsf(e_ang) + w3 * control_u ;
+
+	if (angle_sp >= 0) {
+
+		if (_ang_max < _ang_act) {  //  max angle
+			_ang_max = _ang_act;
+		}
+
+		if (_ang_act  > 0.9f * angle_sp && _ang_act  < 1.1f * angle_sp && !_time_reached) { //  reached time
+			_time_reached = _time;
+			_j_pid_tune += w5 * _time_reached;
+			mavlink_log_critical(&mavlink_log_pub, "time reached = %d", _time_reached);
+		}
+
+		if (error_ang_bet  < 0.0f && _ang_act > angle_sp) {  // overshot;
+			_j_pid_tune  += w4 * fabsf(error_ang_bet);
+
+			if (!_time_overshot) {
+				_time_overshot = _time;
+				mavlink_log_critical(&mavlink_log_pub, "roll overshot = %.2f", (double)((_ang_act - angle_sp) / angle_sp));
+			}
+		}
+
+	} else {
+
+		if (_ang_max > _ang_act) {
+			_ang_max = _ang_act;
+		}
+
+		if (_ang_act  < 0.9f * angle_sp && _ang_act  > 1.1f * angle_sp && !_time_reached) {
+			_time_reached = _time;
+			_j_pid_tune += w5 * _time_reached;
+			mavlink_log_critical(&mavlink_log_pub, "time reached = %d", _time_reached);
+		}
+
+		if (error_ang_bet  > 0.0f && _ang_act < angle_sp) {  // overshot;
+			if (!_time_overshot) {
+				_time_overshot = _time;
+				mavlink_log_critical(&mavlink_log_pub, "angle overshot = %.2f", (double)((_ang_act - angle_sp) / angle_sp));
+			}
+
+			_j_pid_tune  += w4 * fabsf(error_ang_bet);
+		}
+	}
+
+	if (_time > _time_reached && _time < _params.mc_pid_time) {
+		_ang_sum += _ang_act;
+	}
+
+	// some adjustments for pid tuning.
+	if (_time == _params.mc_pid_time) {
+		mavlink_log_critical(&mavlink_log_pub, "max= %.2f  average= %.2f J= %.2f", (double)(_ang_max * 180.0f / 3.14f),
+				     (double)(_ang_sum / (_time - _time_reached) * 180.0f / 3.14f), (double)_j_pid_tune);
+
+		if (fabsf(_ang_max) > 0.9f * fabsf(angle_sp) && fabsf(_ang_max) < 1.1f * fabsf(angle_sp) && _time_reached < 1000) {
+			mavlink_log_critical(&mavlink_log_pub, "Nice P and nice D");
+
+			if (fabsf(_ang_sum / (_time - _time_reached)) > 0.9f * fabsf(angle_sp)
+			    && fabsf(_ang_sum / (_time - _time_reached)) < 1.1f * fabsf(angle_sp)) {
+				mavlink_log_critical(&mavlink_log_pub, "Nice I");
+
+			} else if (fabsf(_ang_sum / (_time - _time_reached)) < 0.9f * fabsf(angle_sp)) {
+				mavlink_log_critical(&mavlink_log_pub, "Increase I");
+
+			} else if (fabsf(_ang_sum / (_time - _time_reached)) > 1.1f * fabsf(angle_sp)) {
+				mavlink_log_critical(&mavlink_log_pub, "Decrease I");
+			}
+
+		} else if (fabsf(_ang_max) < 0.9f * fabsf(angle_sp) || _time_reached > 1000) {
+			mavlink_log_critical(&mavlink_log_pub, "increase angle rate p");
+
+		} else if (fabsf(_ang_max) > 1.1f * fabsf(angle_sp) || _time_reached < 550) {
+			mavlink_log_critical(&mavlink_log_pub, "decrease angle rate p");
+		}
+	}
+
+	_ang_pre = _ang_act;
+
+	_pid_tune.j_pid_tune = _j_pid_tune;
+	_pid_tune.e_rate = e_rate;
+	_pid_tune.e_ang = e_ang;
+	_pid_tune.control_u = control_u;
+	_pid_tune.error_ang_bet = error_ang_bet;
+	_pid_tune.ang_act = _ang_act;
+	_pid_tune.angle_sp = angle_sp;
+	_pid_tune.ang_pre = _ang_pre;
+
+	// publish pid profermance.
+	if (_pid_tune_pub != nullptr) {
+		orb_publish(ORB_ID(pid_auto_tune), _pid_tune_pub, &_pid_tune);
+
+	} else {
+		_pid_tune_pub = orb_advertise(ORB_ID(pid_auto_tune), &_pid_tune);
+	}
+
+}
+
 /**
  * Attitude controller.
  * Input: 'vehicle_attitude_setpoint' topics (depending on mode)
@@ -814,13 +1278,51 @@ MulticopterAttitudeControl::control_attitude(float dt)
 
 	_thrust_sp = _v_att_sp.thrust;
 
-	/* construct attitude setpoint rotation matrix */
-	math::Quaternion q_sp(_v_att_sp.q_d[0], _v_att_sp.q_d[1], _v_att_sp.q_d[2], _v_att_sp.q_d[3]);
-	math::Matrix<3, 3> R_sp = q_sp.to_dcm();
-
 	/* get current rotation matrix from control state quaternions */
 	math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
+	math::Quaternion q_sp(_v_att_sp.q_d[0], _v_att_sp.q_d[1], _v_att_sp.q_d[2], _v_att_sp.q_d[3]);
 	math::Matrix<3, 3> R = q_att.to_dcm();
+	_euler_angles = q_att.to_euler();
+	_euler_angles_sp = q_sp.to_euler();
+	_R_pid_tune = R;
+	/* construct attitude setpoint rotation matrix */
+	math::Matrix<3, 3> R_sp;
+
+	// failsafe program.  Reset all PID parameters to the default if turns to manual mode or RTL.
+	if ((_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_MANUAL
+	     || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_RTL) && _params.mc_pid_autotune == 1) {
+		if (_params.mc_pid_axis == 1 || _params.mc_pid_axis == 2) {
+			_params.att_p(0) = 6.5f;
+			_params.rate_p(0) = 0.15f;
+			_params.rate_i(0) = 0.05f;
+			_params.rate_d(0) = 0.003f;
+
+		} else if (_params.mc_pid_axis == 3 || _params.mc_pid_axis == 4) {
+			_params.att_p(1) = 6.5f;
+			_params.rate_p(1) = 0.15f;
+			_params.rate_i(1) = 0.05f;
+			_params.rate_d(1) = 0.003f;
+
+		} else if (_params.mc_pid_axis == 5 || _params.mc_pid_axis == 6) {
+			_params.att_p(2) = 2.8f;
+			_params.rate_p(2) = 0.2f;
+			_params.rate_i(2) = 0.1f;
+			_params.rate_d(2) = 0.00f;
+			_params.rate_ff(2) = 0.0f;
+		}
+	} // failsafe program.
+
+	if (_params.mc_pid_autotune && (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL
+					|| _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_ALTCTL) && _v_control_mode.flag_armed) {
+		pid_tune_advance_action();
+		pid_tune_on_action();
+		R_sp = _R_sp_pid_tune;
+
+	} else {
+		R_sp = q_sp.to_dcm();
+		_time = 0;
+	}
+
 
 	/* all input data is ready, run controller itself */
 
@@ -891,7 +1393,8 @@ MulticopterAttitudeControl::control_attitude(float dt)
 	}
 
 	/* calculate angular rates setpoint */
-	_rates_sp = _params.att_p.emult(e_R);
+	_rates_sp = _params.att_p.emult(e_R);  // angle error
+	_e_ang = e_R;
 
 
 	/* Feed forward the yaw setpoint rate. We need to transform the yaw from world into body frame.
@@ -1000,7 +1503,8 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	math::Vector<3> rates_d_scaled = _params.rate_d.emult(pid_attenuations(_params.tpa_breakpoint_d, _params.tpa_rate_d));
 
 	/* angular rates error */
-	math::Vector<3> rates_err = _rates_sp - rates;
+	math::Vector<3> rates_err = _rates_sp - rates;  // rates error
+	_e_rate = rates_err;
 
 	_att_control = rates_p_scaled.emult(rates_err) +
 		       _rates_int +
@@ -1053,6 +1557,8 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 
 	}
 }
+
+
 
 void
 MulticopterAttitudeControl::task_main_trampoline(int argc, char *argv[])
@@ -1240,7 +1746,7 @@ MulticopterAttitudeControl::task_main()
 				_actuators.timestamp = hrt_absolute_time();
 				_actuators.timestamp_sample = _sensor_gyro.timestamp;
 
-				// PX4_INFO("_actuators.control[7] = %.2f", (double)_actuators.control[7]);
+//				 PX4_INFO("_actuators.control[0] = %.2f", (double)_actuators.control[0]);
 				/* scale effort by battery status */
 				if (_params.bat_scale_en && _battery_status.scale > 0.0f) {
 					for (int i = 0; i < 4; i++) {
@@ -1273,6 +1779,7 @@ MulticopterAttitudeControl::task_main()
 					_controller_status_pub = orb_advertise(ORB_ID(mc_att_ctrl_status), &_controller_status);
 				}
 			}
+
 
 			if (_v_control_mode.flag_control_termination_enabled) {
 				if (!_vehicle_status.is_vtol) {
@@ -1346,7 +1853,7 @@ MulticopterAttitudeControl::start()
 	_control_task = px4_task_spawn_cmd("mc_att_control",
 					   SCHED_DEFAULT,
 					   SCHED_PRIORITY_ATTITUDE_CONTROL,
-					   1700,
+					   2100,    // bigger stack size
 					   (px4_main_t)&MulticopterAttitudeControl::task_main_trampoline,
 					   nullptr);
 

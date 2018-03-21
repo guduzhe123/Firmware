@@ -141,6 +141,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	command_ack_pub(nullptr),
 	_stm32_cmd_pub(nullptr),
 	_stm32_motor_curr_pub(nullptr),
+	_pid_auto_tune_pub(nullptr),
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_actuator_armed_sub(orb_subscribe(ORB_ID(actuator_armed))),
 	_global_ref_timestamp(0),
@@ -344,6 +345,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 
 	case MAVLINK_MSG_ID_STM32_F3_MOTOR_CURR:
 		handle_message_stm32_motor_curr(msg);
+		break;
+
+	case MAVLINK_MSG_ID_PID_AUTO_TUNE:
+		handle_message_pid_auto_tune(msg);
 		break;
 
 	default:
@@ -1520,6 +1525,13 @@ MavlinkReceiver::handle_message_stm32_motor_curr(mavlink_message_t *msg)
 
 }
 
+void
+MavlinkReceiver::handle_message_pid_auto_tune(mavlink_message_t *msg)
+{
+	mavlink_pid_auto_tune_t pid_tune;
+	mavlink_msg_pid_auto_tune_decode(msg, &pid_tune);
+
+}
 
 switch_pos_t
 MavlinkReceiver::decode_switch_pos(uint16_t buttons, unsigned sw)

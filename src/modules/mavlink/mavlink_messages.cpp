@@ -54,6 +54,7 @@
 #include <px4_time.h>
 #include <systemlib/err.h>
 #include <systemlib/mavlink_log.h>
+#include <v2.0/common/mavlink_msg_pid_auto_tune.h>
 
 #include <v2.0/common/mavlink_msg_stm32_f3_command.h>
 #include <v2.0/common/mavlink_msg_stm32_f3_motor_curr.h>
@@ -101,6 +102,7 @@
 #include <uORB/topics/collision_report.h>
 #include <uORB/topics/stm32_f3_cmd.h>
 #include <uORB/topics/stm32_f3_motor_curr.h>
+#include <uORB/topics/pid_auto_tune.h>
 #include <uORB/uORB.h>
 
 
@@ -3118,7 +3120,11 @@ public:
 
 private:
 	MavlinkOrbSubscription *_flow_sub;
+
+	MavlinkOrbSubscription *_pid_tune_sub;
+
 	uint64_t _flow_time;
+	uint64_t _pid_tune_time;
 
 	/* do not allow top copying this class */
 	MavlinkStreamOpticalFlowRad(MavlinkStreamOpticalFlowRad &);
@@ -3127,12 +3133,15 @@ private:
 protected:
 	explicit MavlinkStreamOpticalFlowRad(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_flow_sub(_mavlink->add_orb_subscription(ORB_ID(optical_flow))),
-		_flow_time(0)
+		_pid_tune_sub(_mavlink->add_orb_subscription(ORB_ID(pid_auto_tune))),
+		_flow_time(0),
+		_pid_tune_time(0)
 	{}
 
 	bool send(const hrt_abstime t)
 	{
 		struct optical_flow_s flow;
+		struct pid_auto_tune_s pid_tune = {};
 
 		if (_flow_sub->update(&_flow_time, &flow)) {
 			mavlink_optical_flow_rad_t msg = {};
@@ -3150,9 +3159,21 @@ protected:
 			msg.sensor_id = flow.sensor_id;
 			msg.time_delta_distance_us = flow.time_since_last_sonar_update;
 			msg.temperature = flow.gyro_temperature;
-
 			mavlink_msg_optical_flow_rad_send_struct(_mavlink->get_channel(), &msg);
+			return true;
+		}
 
+		if (_pid_tune_sub->update(&_pid_tune_time, &pid_tune)) {
+
+			mavlink_optical_flow_rad_t msg = {};
+
+			msg.integrated_x = pid_tune.e_rate;
+			msg.integrated_y = pid_tune.e_ang;
+			msg.integrated_xgyro = pid_tune.control_u;
+			msg.integrated_ygyro = pid_tune.error_ang_bet;
+			msg.integrated_zgyro = pid_tune.ang_pre;
+//            msg.distance = pid_tune.ground_distance_m;
+			mavlink_msg_optical_flow_rad_send_struct(_mavlink->get_channel(), &msg);
 			return true;
 		}
 
@@ -3195,7 +3216,9 @@ public:
 
 private:
 	MavlinkOrbSubscription *_debug_sub;
+	MavlinkOrbSubscription *_pid_tune_sub;
 	uint64_t _debug_time;
+	uint64_t _pid_tune_time;
 
 	/* do not allow top copying this class */
 	MavlinkStreamNamedValueFloat(MavlinkStreamNamedValueFloat &);
@@ -3204,21 +3227,25 @@ private:
 protected:
 	explicit MavlinkStreamNamedValueFloat(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_debug_sub(_mavlink->add_orb_subscription(ORB_ID(debug_key_value))),
-		_debug_time(0)
+		_pid_tune_sub(_mavlink->add_orb_subscription(ORB_ID(pid_auto_tune))),
+		_debug_time(0),
+		_pid_tune_time(0)
 	{}
 
 	bool send(const hrt_abstime t)
 	{
-		struct debug_key_value_s debug;
+		struct debug_key_value_s debug = {};
+		struct pid_auto_tune_s   pid_tune = {};
 
-		if (_debug_sub->update(&_debug_time, &debug)) {
+		if (_debug_sub->update(&_debug_time, &debug) || _pid_tune_sub->update(&_pid_tune_time, &pid_tune)) {
 			mavlink_named_value_float_t msg = {};
 
 			msg.time_boot_ms = debug.timestamp_ms;
 			memcpy(msg.name, debug.key, sizeof(msg.name));
 			/* enforce null termination */
 			msg.name[sizeof(msg.name) - 1] = '\0';
-			msg.value = debug.value;
+//			msg.value = debug.value;
+			msg.value = pid_tune.j_pid_tune;
 
 			mavlink_msg_named_value_float_send_struct(_mavlink->get_channel(), &msg);
 
@@ -4467,6 +4494,81 @@ protected:
 	}
 };
 
+class MavlinkStreamPidTune : public MavlinkStream
+{
+public:
+	const char *get_name() const
+	{
+		return MavlinkStreamPidTune::get_name_static();
+	}
+
+	static const char *get_name_static()
+	{
+		return "PID_AUTO_TUNE";
+	}
+
+	static uint16_t get_id_static()
+	{
+		return MAVLINK_MSG_ID_PID_AUTO_TUNE;
+	}
+
+	uint16_t get_id()
+	{
+		return get_id_static();
+	}
+
+	static MavlinkStream *new_instance(Mavlink *mavlink)
+	{
+		return new MavlinkStreamPidTune(mavlink);
+	}
+
+	unsigned get_size()
+	{
+		return MAVLINK_MSG_ID_HIL_STATE_QUATERNION_LEN +
+		       MAVLINK_NUM_NON_PAYLOAD_BYTES;
+	}
+
+private:
+	MavlinkOrbSubscription *_pid_tune_sub;
+	uint64_t _pid_time;
+
+	/* do not allow top copying this class */
+	MavlinkStreamPidTune(MavlinkStreamPidTune &);
+	MavlinkStreamPidTune &operator = (const MavlinkStreamPidTune &);
+
+protected:
+	explicit MavlinkStreamPidTune(Mavlink *mavlink) : MavlinkStream(mavlink),
+		_pid_tune_sub(_mavlink->add_orb_subscription(ORB_ID(pid_auto_tune))),
+		_pid_time(0)
+	{}
+
+	bool send(const hrt_abstime t)
+	{
+		struct pid_auto_tune_s _pid_tune = {};
+
+		bool pid_updated = _pid_tune_sub->update(&_pid_time, &_pid_tune);
+
+		if (pid_updated) {
+
+			mavlink_pid_auto_tune_t msg = {};
+
+			msg.j_pid_tune = _pid_tune.j_pid_tune;
+			msg.e_rate = _pid_tune.e_rate;
+			msg.e_ang = _pid_tune.e_ang;
+			msg.control_u = _pid_tune.control_u;
+			msg.error_ang_bet = _pid_tune.error_ang_bet;
+			msg.ang_act = _pid_tune.ang_act;
+			msg.angle_sp = _pid_tune.angle_sp;
+			msg.ang_pre = _pid_tune.ang_pre;
+
+			mavlink_msg_pid_auto_tune_send_struct(_mavlink->get_channel(), &msg);
+			return true;
+		}
+
+		return false;
+	}
+};
+
 const StreamListItem *streams_list[] = {
 	new StreamListItem(&MavlinkStreamHeartbeat::new_instance, &MavlinkStreamHeartbeat::get_name_static, &MavlinkStreamHeartbeat::get_id_static),
 	new StreamListItem(&MavlinkStreamStatustext::new_instance, &MavlinkStreamStatustext::get_name_static, &MavlinkStreamStatustext::get_id_static),
@@ -4520,5 +4622,6 @@ const StreamListItem *streams_list[] = {
 	new StreamListItem(&MavlinkStreamGroundTruth::new_instance, &MavlinkStreamGroundTruth::get_name_static, &MavlinkStreamGroundTruth::get_id_static),
 	new StreamListItem(&MavlinkStreamStm32F3CMD::new_instance, &MavlinkStreamStm32F3CMD::get_name_static, &MavlinkStreamStm32F3CMD::get_id_static),
 	new StreamListItem(&MavlinkStreamStm32F3CURR::new_instance, &MavlinkStreamStm32F3CURR::get_name_static, &MavlinkStreamStm32F3CURR::get_id_static),
+	new StreamListItem(&MavlinkStreamPidTune::new_instance, &MavlinkStreamPidTune::get_name_static, &MavlinkStreamPidTune::get_id_static),
 	nullptr
 };
