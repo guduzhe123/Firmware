@@ -215,7 +215,7 @@ dodeca_bottom_cox = [
 
 hexa_dismotor_1 = [
     [ 0, 0, 0, 0],
-    [ 1.7253, 0, 0, 0],
+    [ 1.7253, 0, 0, 1],
     [ 0.4313, 0.7471, 0, 1],
     [-0.4313, -0.7471, 0, 1],
     [-0.4313, 0.7471, 0, 1],
@@ -223,60 +223,78 @@ hexa_dismotor_1 = [
 ]
 
 hexa_dismotor_2 = [
-    [-1.7253, 0, 0, 0],
+    [-1.7253, 0, 0, 1],
     [ 0, 0, 0, 0],
-    [ 0.4313, 0.7471, 0, 1.2],
-    [-0.4313, -0.7471, 0, 1.2],
-    [-0.4313, 0.7471, 0, 1.2],
-    [ 0.4313, -0.7471, 0, 1.2],
+    [ 0.4313, 0.7471, 0, 1],
+    [-0.4313, -0.7471, 0, 1],
+    [-0.4313, 0.7471, 0, 1],
+    [ 0.4313, -0.7471, 0, 1],
 ]
 
 hexa_dismotor_3 = [
     [-0.8627, 0, 0, 1],
     [ 0.8627, 0, 0, 1],
     [ 0, 0, 0, 0],
-    [-0.8627, -1.4942, 0, 0],
+    [-0.8627, -1.4942, 0, 1],
     [-0.4313, 0.7471, 0, 1],
     [ 0.4313, -0.7471, 0, 1],
 ]
 
 hexa_dismotor_4 = [
-    [-0.8627, 0, 0, 1.2],
-    [ 0.8627, 0, 0, 1.2],
-    [ 0.8627, 1.4942, 0, 0],
+    [-0.8627, 0, 0, 1],
+    [ 0.8627, 0, 0, 1],
+    [ 0.8627, 1.4942, 0, 1],
     [ 0, 0, 0, 0],
-    [-0.4313, 0.7471, 0, 1.2],
-    [ 0.4313, -0.7471, 0, 1.2],
+    [-0.4313, 0.7471, 0, 1],
+    [ 0.4313, -0.7471, 0, 1],
 ]
 
+# hexa_dismotor_5 = [
+#     [-0.8627, 0, 0, 1],
+#     [ 0.8627, 0, 0, 1],
+#     [ 0.4313, 0.7471, 0, 1],
+#     [-0.4313, -0.7471, 0, 1],
+#     [ 0, 0, 0, 0],
+#     [ 0.8627, -1.4942, 0, 1],
+# ]
+
 hexa_dismotor_5 = [
-    [-0.8627, 0, 0, 1.2],
-    [ 0.8627, 0, 0, 1.2],
-    [ 0.4313, 0.7471, 0, 1.2],
-    [-0.4313, -0.7471, 0, 1.2],
-    [ 0, 0, 0, 0],
-    [ 0.8627, -1.4942, 0, 0],
+    [  90, CW,  170, 160, 1],
+    [ -90, CCW, -170, 160, 1],
+    [ -30, CW,  170, 160, 1],
+    [ 150, CCW, -170, 160, 1],
+    [  30, CCW, -170, 160, 1],
+    [-150, CW,  170, 160, 1],
 ]
 
 hexa_dismotor_6 = [
-    [-0.8627, 0, 0, 1.2],
-    [ 0.8627, 0, 0, 1.2],
-    [ 0.4313, 0.7471, 0, 1.2],
-    [-0.4313, -0.7471, 0, 1.2],
-    [-0.8627, 1.4942, 0, 0],
+    [-0.8627, 0, 0, 1],
+    [ 0.8627, 0, 0, 1],
+    [ 0.4313, 0.7471, 0, 1],
+    [-0.4313, -0.7471, 0, 1],
+    [-0.8627, 1.4942, 0, 1],
     [ 0, 0, 0, 0],
 ]
 
 # hex_tilt = [
-#     [  90, CW,  10, 12, 1],
-#     [ -90, CCW, -10, 12, 1],
-#     [ -30, CW,  10, 12, 1],
-#     [ 150, CCW, -10, 12, 1],
-#     [  30, CCW, -10, 12, 1],
-#     [-150, CW,  10, 12, 1],
+#     [  90, CW,  15, 20, 1],
+#     [ -90, CCW, -15, 20, 1],
+#     [ -30, CW,  15, 20, 1],
+#     [ 150, CCW, -15, 20, 1],
+#     [  30, CCW, -30, 60, 1],
+#     [-150, CW,  15, 20, 1],
 # ]
 
 hex_tilt = [
+    [  90, CW,  15, 20, 1],
+    [ -90, CCW, -15, 20, 1],
+    [ -30, CW,  15, 20, 1],
+    [ 150, CCW, -15, 20, 1],
+    [  30, CCW, -15, 20, 1],
+    [-150, CW,  15, 20, 1],
+]
+
+hex_tilt_s = [
     [  90, CW,  15, 20, 1],
     [ -90, CCW, -15, 20, 1],
     [ -30, CW,  15, 20, 1],
@@ -295,13 +313,18 @@ hexa_degrade = [
 ]
 
 tables = [quad_x, quad_h, quad_plus, quad_v, quad_wide, quad_s250aq, quad_deadcat, hex_x, hex_plus, hex_cox, hex_t, octa_x, octa_plus, octa_cox, octa_cox_wide, twin_engine, tri_y, dodeca_top_cox, dodeca_bottom_cox]
-hexa_tables = [hexa_dismotor_1, hexa_dismotor_2, hexa_dismotor_3, hexa_dismotor_4, hexa_dismotor_5, hexa_dismotor_6,  hexa_degrade]
+# hexa_tables = [hexa_dismotor_1, hexa_dismotor_2, hexa_dismotor_3, hexa_dismotor_4, hexa_dismotor_5, hexa_dismotor_6,  hexa_degrade]
+hexa_tables = [hexa_dismotor_1, hexa_dismotor_2, hexa_dismotor_3, hexa_dismotor_4, hexa_dismotor_6,  hexa_degrade]
+hexa_tilt_tables = [hexa_dismotor_5, hex_tilt]
+
 keys   = ["4x", "4h", "4+", "4v", "4w", "4s", "4dc",
           "6x", "6+", "6c", "6t",
           "8x", "8+", "8c", "8cw",
           "2-", "3y",
           "6m", "6a"]
-keys_hexa = ["6xm1", "6xm2", "6xm3", "6xm4", "6xm5", "6xm6", "6xDCS"]
+# keys_hexa = ["6xm1", "6xm2", "6xm3", "6xm4", "6xm5", "6xm6", "6xDCS"]
+keys_hexa = ["6xm1", "6xm2", "6xm3", "6xm4",  "6xm6", "6xDCS"]
+keys_hexa_tilt = ["6xm5", "6ht"]
 
 def variableName(variable):
     for variableName, value in list(globals().items()):
@@ -319,8 +342,10 @@ def printEnum():
         print("\t{},".format(variableName(table).upper()))
     for table in hexa_tables:
         print("\t{},".format(variableName(table).upper()))
+    for table in hexa_tilt_tables:
+        print("\t{},".format(variableName(table).upper()))
 
-    print("\t{},".format(variableName(hex_tilt).upper()))
+    print("\t{},".format(variableName(hex_tilt_s).upper()))
     print("\n\tMAX_GEOMETRY")
     print("}; // enum class MultirotorGeometry\n")
 
@@ -341,11 +366,28 @@ def printScaleTables():
             print("\t{{ {:9f}, {:9f}, {:9f}, {:9f} }},".format(rollScale, pitchScale, yawScale, thrustScale))
         print("};\n")
 
-    print("const MultirotorMixer::Rotor _config_{}[] = {{".format(variableName(hex_tilt)))
-    for row in hex_tilt:
+    # print("const MultirotorMixer::Rotor _config_{}[] = {{".format(variableName(hex_tilt)))
+
+    for table in hexa_tilt_tables:
+        print("const MultirotorMixer::Rotor _config_{}[] = {{".format(variableName(table)))
+        for row in table:
+            angle, yawScale, alpha, beta, thrustScale = unpackScales(row)
+            rollScale =  rcos(angle + 90)* rcos(beta) * rcos(alpha) +   (rcos(angle + 90) * rcos(beta + 90) + rcos(angle) * rcos(alpha + 90) * rcos(beta)) * yawScale
+            pitchScale =  rcos(angle) * rcos(beta) * rcos(alpha) +  (- rcos(angle) * rcos(beta + 90) + rcos(angle + 90) * rcos(alpha + 90) * rcos(beta)) * yawScale
+            # rollScale =  rcos(angle + 90)* rcos(beta) * rcos(alpha) +  (- rcos(angle) * rcos(beta + 90) + rcos(angle + 90) * rcos(alpha + 90) * rcos(beta)) * yawScale
+            # pitchScale =  rcos(angle) * rcos(beta) * rcos(alpha) +  (rcos(angle + 90) * rcos(beta + 90) + rcos(angle) * rcos(alpha + 90) * rcos(beta)) * yawScale
+            rollScale /=  math.sqrt(rollScale * rollScale + pitchScale * pitchScale)
+            pitchScale /= math.sqrt(rollScale * rollScale + pitchScale * pitchScale)
+            yawScale = rcos(alpha + 90) * rcos(beta) + rcos(alpha) * rcos(beta) * yawScale
+            thrustScale = thrustScale * rcos(beta) * rcos(alpha)
+            print("\t{{ {:9f}, {:9f}, {:9f}, {:9f} }},".format(rollScale, pitchScale, yawScale, thrustScale))
+        print("};\n")
+
+    print("const MultirotorMixer::Rotor _config_{}[] = {{".format(variableName(hex_tilt_s)))
+    for row in hex_tilt_s:
         angle, yawScale, alpha, beta, thrustScale = unpackScales(row)
-        rollScale =  rcos(angle + 90)* rcos(beta) * rcos(alpha) +   (rcos(angle + 90) * rcos(beta + 90) + rcos(angle) * rcos(alpha + 90) * rcos(beta)) * yawScale
-        pitchScale =  rcos(angle) * rcos(beta) * rcos(alpha) +  (- rcos(angle) * rcos(beta + 90) + rcos(angle + 90) * rcos(alpha + 90) * rcos(beta)) * yawScale
+        rollScale =  rcos(angle + 90)* rcos(beta) * rcos(alpha) + (rcos(angle + 90) * rcos(beta + 90) + rcos(angle) * rcos(alpha + 90) * rcos(beta)) * yawScale * rcos(60) + (- rcos(angle) * rcos(beta + 90) + rcos(angle + 90) * rcos(alpha + 90) * rcos(beta)) * yawScale * rcos(150)
+        pitchScale = rcos(angle) * rcos(beta) * rcos(alpha) + (rcos(angle + 90) * rcos(beta + 90) - rcos(angle) * rcos(alpha + 90) * rcos(beta)) * yawScale * rcos(60 + 90) + (- rcos(angle) * rcos(beta + 90) + rcos(angle + 90) * rcos(alpha + 90) * rcos(beta)) * yawScale * rcos(60)
         rollScale /=  math.sqrt(rollScale * rollScale + pitchScale * pitchScale)
         pitchScale /= math.sqrt(rollScale * rollScale + pitchScale * pitchScale)
         yawScale = rcos(alpha + 90) * rcos(beta) + rcos(alpha) * rcos(beta) * yawScale
@@ -361,7 +403,10 @@ def printScaleTablesIndex():
     for table in hexa_tables:
         print("\t&_config_{}[0],".format(variableName(table)))
 
-    print("\t&_config_{}[0],".format(variableName(hex_tilt)))
+    for table in hexa_tilt_tables:
+        print("\t&_config_{}[0],".format(variableName(table)))
+
+    print("\t&_config_{}[0],".format(variableName(hex_tilt_s)))
     print("};\n")
 
 
@@ -371,7 +416,9 @@ def printScaleTablesCounts():
         print("\t{}, /* {} */".format(len(table), variableName(table)))
     for table in hexa_tables:
         print("\t{}, /* {} */".format(len(table), variableName(table)))
-    print("\t{}, /* {} */".format(len(table),variableName(hex_tilt)))
+    for table in hexa_tilt_tables:
+        print("\t{}, /* {} */".format(len(table), variableName(table)))
+    print("\t{}, /* {} */".format(len(table), variableName(hex_tilt_s)))
     print("};\n")
 
 def printScaleTablesKeys():
@@ -380,7 +427,10 @@ def printScaleTablesKeys():
         print("\t\"{}\",\t/* {} */".format(key, variableName(table)))
     for key, table in zip(keys_hexa, hexa_tables):
         print("\t\"{}\",\t/* {} */".format(key, variableName(table)))
-    print("\t\"{}\",\t/* {} */".format("6ht",variableName(hex_tilt)))
+    for key, table in zip(keys_hexa_tilt, hexa_tilt_tables):
+        print("\t\"{}\",\t/* {} */".format(key, variableName(table)))
+
+    print("\t\"{}\",\t/* {} */".format("6hts",variableName(hex_tilt_s)))
     print("};\n")
 
 printEnum()

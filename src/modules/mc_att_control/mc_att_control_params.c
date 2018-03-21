@@ -95,6 +95,32 @@ PARAM_DEFINE_FLOAT(MC_ROLL_P, 6.5f);
 PARAM_DEFINE_FLOAT(MC_ROLLRATE_P, 0.15f);
 
 /**
+ * Roll rate P gain when a motor is disabled
+ *
+ * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.0
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(HT_ROLLRATE_P, 0.25f);
+
+/**
+ * Roll rate P gain when a motor is disabled
+ *
+ * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.0
+ * @max 0.5
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(HTS_ROLLRATE_P, 0.1f);
+
+/**
  * Roll rate I gain
  *
  * Roll rate integral gain. Can be set to compensate static thrust difference or gravity center offset.
@@ -168,6 +194,32 @@ PARAM_DEFINE_FLOAT(MC_PITCH_P, 6.5f);
  * @group Multicopter Attitude Control
  */
 PARAM_DEFINE_FLOAT(MC_PITCHRATE_P, 0.15f);
+
+/**
+ * Pitch rate P gain while one motor is disabled
+ *
+ * Pitch rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.0
+ * @max 0.6
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(HT_PITCHRATE_P, 0.25f);
+
+/**
+ * Pitch rate P gain while one motor is disabled
+ *
+ * Pitch rate proportional gain, i.e. control output for angular speed error 1 rad/s.
+ *
+ * @min 0.0
+ * @max 0.6
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(HTS_PITCHRATE_P, 0.1f);
 
 /**
  * Pitch rate I gain

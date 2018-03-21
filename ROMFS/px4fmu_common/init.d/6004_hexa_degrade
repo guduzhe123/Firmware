@@ -1,6 +1,6 @@
 #!nsh
 #
-# @name Generic Hexarotor x geometry
+# @name Generic Hexarotor x degrade geometry
 #
 # @type Hexarotor x
 # @class Copter
@@ -28,7 +28,7 @@ then
     param set MPC_XY_CRUISE  3.0
 fi
 
-set MIXER hexa_x
+set MIXER hexa_degrade
 
 # Need to set all 8 channels
 set PWM_OUT 12345678

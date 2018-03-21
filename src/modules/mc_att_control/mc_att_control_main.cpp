@@ -84,6 +84,7 @@
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/pid_auto_tune.h>
+#include <uORB/topics/mixer_switch.h>
 #include <uORB/uORB.h>
 #include <systemlib/mavlink_log.h>
 
@@ -146,6 +147,7 @@ private:
 	int		_sensor_gyro_sub[MAX_GYRO_COUNT];	/**< gyro data subscription */
 	int		_sensor_correction_sub;	/**< sensor thermal correction subscription */
 	int		_sensor_bias_sub;	/**< sensor in-run bias correction subscription */
+	int     _mixer_switch_sub;  /* mixer switch subscription*/
 
 	unsigned _gyro_count;
 	int _selected_gyro;
@@ -177,6 +179,7 @@ private:
 	struct sensor_correction_s		_sensor_correction;	/**< sensor thermal corrections */
 	struct sensor_bias_s			_sensor_bias;		/**< sensor in-run bias corrections */
 	struct pid_auto_tune_s          _pid_tune;          /*PID tuning data   */
+	struct mixer_switch_s           _mixer_switch;      /* Mixer switch paramsters*/
 	MultirotorMixer::saturation_status _saturation_status{};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
@@ -285,6 +288,12 @@ private:
 		param_t mc_pid_angle_y;
 		param_t mc_pid_time;
 
+		param_t ht_rollrate_p;  // increase rollrate_p when one motor is disabled with hexa_tilt mixer.
+		param_t ht_pitchrate_p; // increase pitchllrate_p when one motor is disabled with hexa_tilt mixer.
+		param_t hts_rollrate_p;  // increase rollrate_p when one motor is disabled with hexa_tilt_s mixer.
+		param_t hts_pitchrate_p; // increase pitchllrate_p when one motor is disabled with hexa_tilt_s mixer.
+
+
 	}		_params_handles;		/**< handles for interesting parameters */
 
 	struct {
@@ -353,6 +362,7 @@ private:
 	void		vehicle_motor_limits_poll();
 	void		vehicle_rates_setpoint_poll();
 	void		vehicle_status_poll();
+	void        mixer_switch_pool();
 
 	/**
 	 * Attitude controller.
@@ -411,6 +421,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_battery_status_sub(-1),
 	_sensor_correction_sub(-1),
 	_sensor_bias_sub(-1),
+	_mixer_switch_sub(-1),
 
 	/* gyro selection */
 	_gyro_count(1),
@@ -442,6 +453,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_sensor_correction{},
 	_sensor_bias{},
 	_pid_tune{},
+	_mixer_switch{},
 	_saturation_status{},
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "mc_att_control")),
@@ -575,6 +587,11 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params_handles.mc_pid_angle_y = param_find("MC_PID_ANGLE_Y");
 	_params_handles.mc_pid_time = param_find("MC_PID_TIME");
 
+	_params_handles.ht_pitchrate_p      =   param_find("HT_PITCHRATE_P");
+	_params_handles.ht_rollrate_p      =   param_find("HT_ROLLRATE_P");
+	_params_handles.hts_pitchrate_p      =   param_find("HTS_PITCHRATE_P");
+	_params_handles.hts_rollrate_p      =   param_find("HTS_ROLLRATE_P");
+
 	/* fetch initial parameter values */
 	parameters_update();
 
@@ -651,11 +668,31 @@ MulticopterAttitudeControl::parameters_update()
 	param_get(_params_handles.roll_tc, &roll_tc);
 	param_get(_params_handles.pitch_tc, &pitch_tc);
 
+	if (_mixer_switch.mixer_switch_enable && _mixer_switch.motor_stop_num > 0 && _mixer_switch.motor_stop_num < 6) {
+		if (_mixer_switch.motor_stop_num == 1) {
+			param_get(_params_handles.ht_pitchrate_p, &v);
+			_params.rate_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
+			param_get(_params_handles.ht_rollrate_p, &v);
+			_params.rate_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
+		}
+
+		if (_mixer_switch.motor_stop_num == 8) {
+			param_get(_params_handles.hts_pitchrate_p, &v);
+			_params.rate_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
+			param_get(_params_handles.hts_rollrate_p, &v);
+			_params.rate_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
+		}
+
+	} else {
+		param_get(_params_handles.roll_rate_p, &v);
+		_params.rate_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
+		param_get(_params_handles.pitch_rate_p, &v);
+		_params.rate_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
+	}
+
 	/* roll gains */
 	param_get(_params_handles.roll_p, &v);
 	_params.att_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
-	param_get(_params_handles.roll_rate_p, &v);
-	_params.rate_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
 	param_get(_params_handles.roll_rate_i, &v);
 	_params.rate_i(0) = v;
 	param_get(_params_handles.roll_rate_integ_lim, &v);
@@ -668,8 +705,6 @@ MulticopterAttitudeControl::parameters_update()
 	/* pitch gains */
 	param_get(_params_handles.pitch_p, &v);
 	_params.att_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
-	param_get(_params_handles.pitch_rate_p, &v);
-	_params.rate_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
 	param_get(_params_handles.pitch_rate_i, &v);
 	_params.rate_i(1) = v;
 	param_get(_params_handles.pitch_rate_integ_lim, &v);
@@ -870,6 +905,17 @@ MulticopterAttitudeControl::vehicle_status_poll()
 				_actuators_id = ORB_ID(actuator_controls_0);
 			}
 		}
+	}
+}
+
+void
+MulticopterAttitudeControl::mixer_switch_pool()
+{
+	bool updated;
+	orb_check(_mixer_switch_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(mixer_switch), _mixer_switch_sub, &_mixer_switch);
 	}
 }
 
@@ -1498,6 +1544,28 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	rates(1) -= _sensor_bias.gyro_y_bias;
 	rates(2) -= _sensor_bias.gyro_z_bias;
 
+	if (_mixer_switch.mixer_switch_enable && _mixer_switch.motor_stop_num > 0 && _mixer_switch.motor_stop_num < 6) {
+		float v;
+		float roll_tc, pitch_tc;
+
+		param_get(_params_handles.roll_tc, &roll_tc);
+		param_get(_params_handles.pitch_tc, &pitch_tc);
+
+		if (_mixer_switch.motor_stop_num == 1) {
+			param_get(_params_handles.ht_pitchrate_p, &v);
+			_params.rate_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
+			param_get(_params_handles.ht_rollrate_p, &v);
+			_params.rate_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
+		}
+
+		if (_mixer_switch.motor_stop_num == 8) {
+			param_get(_params_handles.hts_pitchrate_p, &v);
+			_params.rate_p(0) = v * (ATTITUDE_TC_DEFAULT / roll_tc);
+			param_get(_params_handles.hts_rollrate_p, &v);
+			_params.rate_p(1) = v * (ATTITUDE_TC_DEFAULT / pitch_tc);
+		}
+	}
+
 	math::Vector<3> rates_p_scaled = _params.rate_p.emult(pid_attenuations(_params.tpa_breakpoint_p, _params.tpa_rate_p));
 	//math::Vector<3> rates_i_scaled = _params.rate_i.emult(pid_attenuations(_params.tpa_breakpoint_i, _params.tpa_rate_i));
 	math::Vector<3> rates_d_scaled = _params.rate_d.emult(pid_attenuations(_params.tpa_breakpoint_d, _params.tpa_rate_d));
@@ -1582,6 +1650,7 @@ MulticopterAttitudeControl::task_main()
 	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_motor_limits_sub = orb_subscribe(ORB_ID(multirotor_motor_limits));
 	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
+	_mixer_switch_sub   = orb_subscribe(ORB_ID(mixer_switch));
 
 	_gyro_count = math::min(orb_group_count(ORB_ID(sensor_gyro)), MAX_GYRO_COUNT);
 
@@ -1652,6 +1721,7 @@ MulticopterAttitudeControl::task_main()
 			vehicle_attitude_poll();
 			sensor_correction_poll();
 			sensor_bias_poll();
+			mixer_switch_pool();
 
 			/* Check if we are in rattitude mode and the pilot is above the threshold on pitch
 			 * or roll (yaw can rotate 360 in normal att control).  If both are true don't

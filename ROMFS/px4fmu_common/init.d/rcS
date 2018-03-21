@@ -807,6 +807,10 @@ then
 			then
 				set MAV_TYPE 13
 			fi
+			if [ $MIXER == hexa_disable_motor1 ]
+			then
+				set MAV_TYPE 13
+			fi
 			if [ $MIXER == octo_x -o $MIXER == octo_+ ]
 			then
 				set MAV_TYPE 14

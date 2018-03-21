@@ -1115,7 +1115,7 @@ PX4IO::task_main()
 				}
 
 			} else if (_mixer_switch.mixer_switch_num == 7) {
-				// switch to hexa disable motor 4
+				// switch to hexa disable motor 6
 				buf = "R: 6xm6 10000 10000 10000 0";
 
 				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
@@ -1124,12 +1124,21 @@ PX4IO::task_main()
 				}
 
 			} else if (_mixer_switch.mixer_switch_num == 8) {
-				// switch to hexa disable motor 4
-				buf = "R: 4x 10000 10000 10000 0";
+				// switch to hexa disable motor 6
+				buf = "R: 6hts 10000 10000 10000 0";
 
 				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
 					ret = mixer_send(buf, strnlen(buf, 2048));
-					mavlink_log_critical(&mavlink_log_pub, "Switch to quad x for test!");
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa tilt 2!");
+				}
+
+			} else  {
+				// switch to hexa x
+				buf = "R: 6x 10000 10000 10000 0";
+
+				if (_stop_num_pre != _mixer_switch.mixer_switch_num) {
+					ret = mixer_send(buf, strnlen(buf, 2048));
+					mavlink_log_critical(&mavlink_log_pub, "Switch to hexa x!");
 				}
 			}
 

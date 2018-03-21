@@ -1,6 +1,6 @@
 #!nsh
 #
-# @name Generic Hexarotor x geometry
+# @name Hexarotor tilted geometry
 #
 # @type Hexarotor x
 # @class Copter
@@ -23,12 +23,14 @@ sh /etc/init.d/rc.mc_defaults
 
 if [ $AUTOCNF == yes ]
 then
-	param set RTL_RETURN_ALT 10.0
+	param set RTL_RETURN_ALT 6.0
 	param set RTL_DESCEND_ALT 3.0
     param set MPC_XY_CRUISE  3.0
+	param set MPC_TILTMAX_AIR 20.0
+	param set MPC_MAN_TILT_MAX 20.0
 fi
 
-set MIXER hexa_x
+set MIXER hexa_tilted
 
 # Need to set all 8 channels
 set PWM_OUT 12345678

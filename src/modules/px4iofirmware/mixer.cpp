@@ -301,7 +301,7 @@ mixer_tick(void)
 		//r_page_servos[1] = 900;//this works
 		uint8_t motor_stop_num = r_setup_motor_stop;//PX4IO_P_SETUP_MOTOR_STOP 34>>3&4(1-6) >> 2&3(start from 0-5)
 
-		if (motor_stop_num > 10) {
+		if (motor_stop_num > 10 && motor_stop_num < 100) {
 			uint8_t motor_stop_num_oppo = motor_stop_num / 10 - 1;//the unit
 			motor_stop_num = motor_stop_num % 10 - 1;//the decade
 			r_page_servos[motor_stop_num] =  900;

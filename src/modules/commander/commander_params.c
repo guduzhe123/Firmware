@@ -725,11 +725,11 @@ PARAM_DEFINE_INT32(MOTOR_STOP_QGC, 0);
 /**
  * Motor Stop Number
  *
- * @min 1
+ * @min 0
  * @max 6
  * @group Commander
  */
-PARAM_DEFINE_INT32(MOTOR_STOP_NUM, 3);
+PARAM_DEFINE_INT32(MOTOR_STOP_NUM, 0);
 
 /**
  * Motor Stop Mixer Switch

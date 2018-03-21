@@ -69,7 +69,7 @@ navigator start
 ekf2 start
 mc_pos_control start
 mc_att_control start
-mixer load /dev/pwm_output0 ROMFS/px4fmu_common/mixers/hexa_x.main.mix
+mixer load /dev/pwm_output0 ROMFS/px4fmu_common/mixers/hexa_tilted_s.main.mix
 mixer append /dev/pwm_output0 ROMFS/px4fmu_common/mixers/mount_legs.aux.mix
 mavlink start -x -u 14556 -r 4000000
 mavlink start -x -u 14557 -r 4000000 -m onboard -o 14540
