@@ -1,6 +1,6 @@
 #!nsh
 #
-# @name Generic Hexarotor x disable motor5 geometry
+# @name Hexarotor x disable motor5 geometry
 #
 # @type Hexarotor x
 # @class Copter

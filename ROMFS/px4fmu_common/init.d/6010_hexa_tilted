@@ -1,6 +1,6 @@
 #!nsh
 #
-# @name Hexarotor x disable motor1 geometry
+# @name Hexarotor tilted geometry
 #
 # @type Hexarotor x
 # @class Copter

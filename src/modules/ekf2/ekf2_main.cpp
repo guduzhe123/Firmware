@@ -1214,19 +1214,19 @@ void Ekf2::run()
 					_vel_body_wind = R_to_body * v_wind_comp; // TODO: move this elsewhere
 
 					// Publish wind estimate
-					wind_estimate_s wind_estimate;
+					/*wind_estimate_s wind_estimate;
 					wind_estimate.timestamp = now;
 					wind_estimate.windspeed_north = velNE_wind[0];
 					wind_estimate.windspeed_east = velNE_wind[1];
 					wind_estimate.variance_north = status.covariances[22];
-					wind_estimate.variance_east = status.covariances[23];
+					wind_estimate.variance_east = status.covariances[23];*/
 
-					if (_wind_pub == nullptr) {
+					/*if (_wind_pub == nullptr) {
 						_wind_pub = orb_advertise(ORB_ID(wind_estimate), &wind_estimate);
 
 					} else {
 						orb_publish(ORB_ID(wind_estimate), _wind_pub, &wind_estimate);
-					}
+					}*/
 				}
 			}
 

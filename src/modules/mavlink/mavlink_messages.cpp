@@ -3954,14 +3954,15 @@ protected:
 		if (_wind_estimate_sub->update(&_wind_estimate_time, &wind_estimate)) {
 
 			mavlink_wind_cov_t msg = {};
-
 			msg.time_usec = wind_estimate.timestamp;
 
-			msg.wind_x = wind_estimate.windspeed_north;
+			msg.wind_x = wind_estimate.windlevel_horiz;
 			msg.wind_y = wind_estimate.windspeed_east;
 			msg.wind_z = 0.0f;
 
 			msg.var_horiz = wind_estimate.variance_north + wind_estimate.variance_east;
+//            msg.var_horiz = wind_estimate.windlevel_horiz;
+
 			msg.var_vert = 0.0f;
 
 			struct vehicle_global_position_s global_pos = {};

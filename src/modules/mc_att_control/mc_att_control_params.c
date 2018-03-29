@@ -653,3 +653,27 @@ PARAM_DEFINE_FLOAT(MC_PID_ANGLE_Y, 180);
  * @group Multicopter Attitude Control
  */
 PARAM_DEFINE_INT32(MC_PID_TIME, 2000);
+
+/**
+ * wind detect
+ *
+ * 0 disable this function, 1 enable this function
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_WIND_DET, 0);
+
+/**
+ * wind detect
+ *
+ * 0 disable this function, 1 enable this function
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_START_NUM, 4.0f);
+
+/**
+ * wind detect
+ *
+ * 0 disable this function, 1 enable this function
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_WIND_THRUST, 0.7f);

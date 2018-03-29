@@ -85,6 +85,9 @@
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/pid_auto_tune.h>
 #include <uORB/topics/mixer_switch.h>
+#include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/actuator_outputs.h>
 #include <uORB/uORB.h>
 #include <systemlib/mavlink_log.h>
 
@@ -148,6 +151,8 @@ private:
 	int		_sensor_correction_sub;	/**< sensor thermal correction subscription */
 	int		_sensor_bias_sub;	/**< sensor in-run bias correction subscription */
 	int     _mixer_switch_sub;  /* mixer switch subscription*/
+	int     _vehicleLocalPosition_sub;
+	int     _actuator_outputs_sub;
 
 	unsigned _gyro_count;
 	int _selected_gyro;
@@ -160,6 +165,8 @@ private:
 	orb_advert_t	_actuators_0_pub;		/**< attitude actuator controls publication */
 	orb_advert_t	_controller_status_pub;	/**< controller status publication */
 	orb_advert_t    _pid_tune_pub;         /* PID tuning publication  */
+	orb_advert_t    _wind_estimate_pub;    /* */
+
 
 	orb_id_t _rates_sp_id;	/**< pointer to correct rates setpoint uORB metadata structure */
 	orb_id_t _actuators_id;	/**< pointer to correct actuator controls0 uORB metadata structure */
@@ -180,6 +187,9 @@ private:
 	struct sensor_bias_s			_sensor_bias;		/**< sensor in-run bias corrections */
 	struct pid_auto_tune_s          _pid_tune;          /*PID tuning data   */
 	struct mixer_switch_s           _mixer_switch;      /* Mixer switch paramsters*/
+	struct wind_estimate_s          _wind_estimate;     /*wind estimate*/
+	struct vehicle_local_position_s				_vehicleLocalPosition;
+	struct actuator_outputs_s       _actuator_outputs;
 	MultirotorMixer::saturation_status _saturation_status{};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
@@ -219,6 +229,12 @@ private:
 	int w3 ;
 	int w4 ;
 	float w5 ;
+
+	int64_t _time_start_wind;
+	int _time_warn;
+
+	int32_t _time_high_thrust;
+	int64_t _time_high_pwm;
 
 	enum PID_STATE {
 		TUNE_NONE = 0,   /* don't tune */
@@ -292,7 +308,10 @@ private:
 		param_t ht_pitchrate_p; // increase pitchllrate_p when one motor is disabled with hexa_tilt mixer.
 		param_t hts_rollrate_p;  // increase rollrate_p when one motor is disabled with hexa_tilt_s mixer.
 		param_t hts_pitchrate_p; // increase pitchllrate_p when one motor is disabled with hexa_tilt_s mixer.
-
+		param_t wind_detect;     // enable wind detect feature or not.
+		param_t wind_start_num;  // wind level start number.
+		param_t wind_thrust_max;  // wind disturbance warning while thrust is so big than this level.
+		param_t sys_autostart;
 
 	}		_params_handles;		/**< handles for interesting parameters */
 
@@ -338,6 +357,10 @@ private:
 		float mc_pid_angle_rp;
 		float mc_pid_angle_y;
 		int mc_pid_time;
+		int wind_detect;
+		float wind_start_num;
+		float wind_thrust_max;
+		int   sys_autostart;
 
 	}		_params;
 
@@ -363,7 +386,8 @@ private:
 	void		vehicle_rates_setpoint_poll();
 	void		vehicle_status_poll();
 	void        mixer_switch_pool();
-
+	void        vehicleLocalPosition_pool();
+	void        actuator_outputs_pool();
 	/**
 	 * Attitude controller.
 	 */
@@ -397,6 +421,9 @@ private:
 
 	/* move to next action item*/
 	void       pid_tune_advance_action();
+
+	/* detect wind disturbance*/
+	void       wind_detect();
 };
 
 namespace mc_att_control
@@ -422,6 +449,8 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_sensor_correction_sub(-1),
 	_sensor_bias_sub(-1),
 	_mixer_switch_sub(-1),
+	_vehicleLocalPosition_sub(-1),
+	_actuator_outputs_sub(-1),
 
 	/* gyro selection */
 	_gyro_count(1),
@@ -435,6 +464,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_actuators_0_pub(nullptr),
 	_controller_status_pub(nullptr),
 	_pid_tune_pub(nullptr),
+	_wind_estimate_pub(nullptr),
 	_rates_sp_id(nullptr),
 	_actuators_id(nullptr),
 
@@ -454,6 +484,9 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_sensor_bias{},
 	_pid_tune{},
 	_mixer_switch{},
+	_wind_estimate{},
+	_vehicleLocalPosition{},
+	_actuator_outputs{},
 	_saturation_status{},
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "mc_att_control")),
@@ -523,6 +556,10 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	w3 = 10;
 	w4 = 10;
 	w5 = 0.05;
+	_time_start_wind = 0;
+	_time_warn = 0;
+	_time_high_thrust = 0;
+	_time_high_pwm = 0;
 	pid_tune_stop = 0;
 
 
@@ -586,6 +623,10 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params_handles.mc_pid_angle_rp = param_find("MC_PID_ANGLE_RP");
 	_params_handles.mc_pid_angle_y = param_find("MC_PID_ANGLE_Y");
 	_params_handles.mc_pid_time = param_find("MC_PID_TIME");
+	_params_handles.wind_detect = param_find("MC_WIND_DET");
+	_params_handles.wind_start_num = param_find("MC_START_NUM");
+	_params_handles.wind_thrust_max = param_find("MC_WIND_THRUST");
+	_params_handles.sys_autostart  =  param_find("SYS_AUTOSTART");
 
 	_params_handles.ht_pitchrate_p      =   param_find("HT_PITCHRATE_P");
 	_params_handles.ht_rollrate_p      =   param_find("HT_ROLLRATE_P");
@@ -806,6 +847,10 @@ MulticopterAttitudeControl::parameters_update()
 	param_get(_params_handles.mc_pid_angle_rp, &(_params.mc_pid_angle_rp));
 	param_get(_params_handles.mc_pid_angle_y, &(_params.mc_pid_angle_y));
 	param_get(_params_handles.mc_pid_time, &(_params.mc_pid_time));
+	param_get(_params_handles.wind_detect, &(_params.wind_detect));
+	param_get(_params_handles.wind_start_num, &(_params.wind_start_num));
+	param_get(_params_handles.wind_thrust_max, &(_params.wind_thrust_max));
+	param_get(_params_handles.sys_autostart, &(_params.sys_autostart));
 }
 
 void
@@ -920,6 +965,18 @@ MulticopterAttitudeControl::mixer_switch_pool()
 }
 
 void
+MulticopterAttitudeControl::vehicleLocalPosition_pool()
+{
+	bool updated;
+	orb_check(_vehicleLocalPosition_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_local_position), _vehicleLocalPosition_sub, &_vehicleLocalPosition);
+	}
+}
+
+
+void
 MulticopterAttitudeControl::vehicle_motor_limits_poll()
 {
 	/* check if there is a new message */
@@ -931,6 +988,17 @@ MulticopterAttitudeControl::vehicle_motor_limits_poll()
 		orb_copy(ORB_ID(multirotor_motor_limits), _motor_limits_sub, &motor_limits);
 
 		_saturation_status.value = motor_limits.saturation_status;
+	}
+}
+
+void
+MulticopterAttitudeControl::actuator_outputs_pool()
+{
+	bool updated;
+	orb_check(_actuator_outputs_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(actuator_outputs), _actuator_outputs_sub, &_actuator_outputs);
 	}
 }
 
@@ -1626,7 +1694,80 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 	}
 }
 
+void
+MulticopterAttitudeControl::wind_detect()
+{
+	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL) {
+		if (fabsf(_manual_control_sp.x) < 0.001f  && fabsf(_manual_control_sp.y) < 0.001f) {
+			math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
+			math::Vector<3> euler_angles_sp;
+			euler_angles_sp = q_att.to_euler();
 
+			float roll_pitch_angle;
+			roll_pitch_angle = sqrtf(euler_angles_sp(0) * euler_angles_sp(0) + euler_angles_sp(1) * euler_angles_sp(1));
+			_time_start_wind++;
+
+			if (roll_pitch_angle * 180.0f / 3.14f > _params.wind_start_num
+			    && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 2.0f)) {
+				_wind_estimate.windlevel_horiz = 3.0f;
+
+			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 2.0f)
+				   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 4.0f)) {
+				_wind_estimate.windlevel_horiz = 4.0f;
+
+			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 4.0f)
+				   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 6.0f)) {
+				if (_time_start_wind % 250 == 1 || !_time_warn) {
+					_time_warn = 1;
+					mavlink_log_critical(&mavlink_log_pub, "Big wind, please fly with caution ");
+				}
+
+				_wind_estimate.windlevel_horiz = 5.0f;
+
+			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 6.0f)) {
+				if (_time_start_wind % 250 == 1 || !_time_warn) {
+					_time_warn = 1;
+//					PX4_INFO("roll_pitch_angle = %.2f", (double)(roll_pitch_angle * 180.0f / 3.14f));
+					mavlink_log_critical(&mavlink_log_pub, "Warning, critical wind, land advise");
+				}
+
+				_wind_estimate.windlevel_horiz = 6.0f;
+
+			} else if (roll_pitch_angle * 180.0f / 3.14f < _params.wind_start_num) {
+				_time_start_wind = 0;
+				_time_warn = 0;
+				_wind_estimate.windlevel_horiz = 2.0f;
+			}
+
+			// publish wind estimate.
+			if (_wind_estimate_pub != nullptr) {
+				orb_publish(ORB_ID(wind_estimate), _wind_estimate_pub, &_wind_estimate);
+
+			} else {
+				_wind_estimate_pub = orb_advertise(ORB_ID(wind_estimate), &_wind_estimate);
+			}
+
+		}
+	}
+
+	// TODO check if thrust and PWM of motors is so high that the uav cannot finish the mission.
+	if (_v_att_sp.thrust > _params.wind_thrust_max && _vehicleLocalPosition.z_valid) {
+		_time_high_thrust++;
+
+		if (_time_high_thrust % 500 == 1) {
+			mavlink_log_critical(&mavlink_log_pub, "high thrust hover, land advise");
+		}
+	}
+
+	//    PX4_INFO("actuator_outputs.output[0] =%.2f", (double)_actuator_outputs.output[0]);
+	for (int i = 0; i < _params.sys_autostart / 1000 + 1; i++) {
+		_time_high_pwm++;
+
+		if (_actuator_outputs.output[i] > 1850.0f && _time_high_pwm % 500 == 1) {
+			mavlink_log_critical(&mavlink_log_pub, "high motor pwm");
+		}
+	}
+}
 
 void
 MulticopterAttitudeControl::task_main_trampoline(int argc, char *argv[])
@@ -1651,6 +1792,8 @@ MulticopterAttitudeControl::task_main()
 	_motor_limits_sub = orb_subscribe(ORB_ID(multirotor_motor_limits));
 	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
 	_mixer_switch_sub   = orb_subscribe(ORB_ID(mixer_switch));
+	_vehicleLocalPosition_sub = orb_subscribe(ORB_ID(vehicle_local_position));
+	_actuator_outputs_sub  = orb_subscribe(ORB_ID(actuator_outputs));
 
 	_gyro_count = math::min(orb_group_count(ORB_ID(sensor_gyro)), MAX_GYRO_COUNT);
 
@@ -1673,6 +1816,10 @@ MulticopterAttitudeControl::task_main()
 	poll_fds.events = POLLIN;
 
 	while (!_task_should_exit) {
+
+		if (_params.wind_detect) {
+			wind_detect();
+		}
 
 		poll_fds.fd = _sensor_gyro_sub[_selected_gyro];
 
@@ -1722,6 +1869,8 @@ MulticopterAttitudeControl::task_main()
 			sensor_correction_poll();
 			sensor_bias_poll();
 			mixer_switch_pool();
+			vehicleLocalPosition_pool();
+			actuator_outputs_pool();
 
 			/* Check if we are in rattitude mode and the pilot is above the threshold on pitch
 			 * or roll (yaw can rotate 360 in normal att control).  If both are true don't

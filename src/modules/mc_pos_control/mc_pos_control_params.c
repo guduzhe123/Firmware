@@ -585,10 +585,9 @@ PARAM_DEFINE_FLOAT(MPC_LAND_ALT2, 5.0f);
 PARAM_DEFINE_FLOAT(MPC_TKO_RAMP_T, 0.4f);
 
 /**
- * Position control smooth takeoff ramp time constant
+ * Position control smooth brake constant
  *
- * Increasing this value will make automatic and manual takeoff slower.
- * If it's too slow the drone might scratch the ground and tip over.
+ * smooth takeoff parameter 1.
  *
  * @min 0
  * @max 1
@@ -597,10 +596,9 @@ PARAM_DEFINE_FLOAT(MPC_TKO_RAMP_T, 0.4f);
 PARAM_DEFINE_INT32(MPC_SMOOTH_DIS, 1);
 
 /**
- * Position control smooth takeoff ramp time constant
+ * Position control smooth brake constant
  *
- * Increasing this value will make automatic and manual takeoff slower.
- * If it's too slow the drone might scratch the ground and tip over.
+ * smooth brake parameter 2
  * @group Multicopter Position Control
  */
-PARAM_DEFINE_INT32(MPC_JUDG_DIS, 0);
+PARAM_DEFINE_INT32(MPC_JUDG_DIS, 1);

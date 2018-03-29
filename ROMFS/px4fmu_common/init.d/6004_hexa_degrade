@@ -1,6 +1,6 @@
 #!nsh
 #
-# @name Generic Hexarotor x degrade geometry
+# @name Hexarotor x degrade geometry
 #
 # @type Hexarotor x
 # @class Copter
