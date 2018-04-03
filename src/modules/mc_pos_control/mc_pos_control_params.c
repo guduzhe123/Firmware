@@ -602,3 +602,12 @@ PARAM_DEFINE_INT32(MPC_SMOOTH_DIS, 1);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_INT32(MPC_JUDG_DIS, 1);
+
+/**
+ * max rotating angle speed for wind detect
+ *
+ * @max 15
+ * @min 0
+ * @group Multicopter Position Control
+ */
+PARAM_DEFINE_FLOAT(MPC_MAX_ROTATION, 0.02f);

@@ -88,6 +88,7 @@
 #include <uORB/topics/wind_estimate.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/actuator_outputs.h>
+#include <uORB/topics/user_intention.h>
 #include <uORB/uORB.h>
 #include <systemlib/mavlink_log.h>
 
@@ -153,6 +154,7 @@ private:
 	int     _mixer_switch_sub;  /* mixer switch subscription*/
 	int     _vehicleLocalPosition_sub;
 	int     _actuator_outputs_sub;
+	int     _user_intention_sub;
 
 	unsigned _gyro_count;
 	int _selected_gyro;
@@ -190,6 +192,8 @@ private:
 	struct wind_estimate_s          _wind_estimate;     /*wind estimate*/
 	struct vehicle_local_position_s				_vehicleLocalPosition;
 	struct actuator_outputs_s       _actuator_outputs;
+	struct user_intention_s             _user_intention_msg;
+
 	MultirotorMixer::saturation_status _saturation_status{};
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
@@ -312,6 +316,7 @@ private:
 		param_t wind_start_num;  // wind level start number.
 		param_t wind_thrust_max;  // wind disturbance warning while thrust is so big than this level.
 		param_t sys_autostart;
+		param_t max_rotation;
 
 	}		_params_handles;		/**< handles for interesting parameters */
 
@@ -361,6 +366,7 @@ private:
 		float wind_start_num;
 		float wind_thrust_max;
 		int   sys_autostart;
+		float max_rotation;
 
 	}		_params;
 
@@ -451,6 +457,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_mixer_switch_sub(-1),
 	_vehicleLocalPosition_sub(-1),
 	_actuator_outputs_sub(-1),
+	_user_intention_sub(-1),
 
 	/* gyro selection */
 	_gyro_count(1),
@@ -487,6 +494,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_wind_estimate{},
 	_vehicleLocalPosition{},
 	_actuator_outputs{},
+	_user_intention_msg{},
 	_saturation_status{},
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "mc_att_control")),
@@ -627,6 +635,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params_handles.wind_start_num = param_find("MC_START_NUM");
 	_params_handles.wind_thrust_max = param_find("MC_WIND_THRUST");
 	_params_handles.sys_autostart  =  param_find("SYS_AUTOSTART");
+	_params_handles.max_rotation = param_find("MC_MAX_ROTATION");
 
 	_params_handles.ht_pitchrate_p      =   param_find("HT_PITCHRATE_P");
 	_params_handles.ht_rollrate_p      =   param_find("HT_ROLLRATE_P");
@@ -851,6 +860,7 @@ MulticopterAttitudeControl::parameters_update()
 	param_get(_params_handles.wind_start_num, &(_params.wind_start_num));
 	param_get(_params_handles.wind_thrust_max, &(_params.wind_thrust_max));
 	param_get(_params_handles.sys_autostart, &(_params.sys_autostart));
+	param_get(_params_handles.max_rotation, &(_params.max_rotation));
 }
 
 void
@@ -1697,8 +1707,21 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 void
 MulticopterAttitudeControl::wind_detect()
 {
+	bool updated;
+	orb_check(_user_intention_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(user_intention), _user_intention_sub, &_user_intention_msg);
+	}
+
+//    PX4_INFO("user_intention_xy = %d, intention = %d, brake = %d", _user_intention_msg.user_intention_xy, _user_intention_msg.intention, _user_intention_msg.brake);
+	bool rotating = (fabsf(_v_att.rollspeed)  > _params.max_rotation) ||
+			(fabsf(_v_att.pitchspeed) > _params.max_rotation) ||
+			(fabsf(_v_att.yawspeed) > _params.max_rotation);
+
 	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL) {
-		if (fabsf(_manual_control_sp.x) < 0.001f  && fabsf(_manual_control_sp.y) < 0.001f) {
+//		if (fabsf(_manual_control_sp.x) < 0.001f  && fabsf(_manual_control_sp.y) < 0.001f) {
+		if (!_user_intention_msg.user_intention_xy && !_user_intention_msg.brake && !rotating) {
 			math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
 			math::Vector<3> euler_angles_sp;
 			euler_angles_sp = q_att.to_euler();
@@ -1727,8 +1750,7 @@ MulticopterAttitudeControl::wind_detect()
 			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 6.0f)) {
 				if (_time_start_wind % 250 == 1 || !_time_warn) {
 					_time_warn = 1;
-//					PX4_INFO("roll_pitch_angle = %.2f", (double)(roll_pitch_angle * 180.0f / 3.14f));
-					mavlink_log_critical(&mavlink_log_pub, "Warning, critical wind, land advise");
+					mavlink_log_critical(&mavlink_log_pub, "Critical wind, land advise");
 				}
 
 				_wind_estimate.windlevel_horiz = 6.0f;
@@ -1750,23 +1772,25 @@ MulticopterAttitudeControl::wind_detect()
 		}
 	}
 
-	// TODO check if thrust and PWM of motors is so high that the uav cannot finish the mission.
-	if (_v_att_sp.thrust > _params.wind_thrust_max && _vehicleLocalPosition.z_valid) {
-		_time_high_thrust++;
+	// TODO check if thrust or PWM of motors is so high that the uav cannot finish the mission.
+	if (_vehicleLocalPosition.z_valid && fabsf(_vehicleLocalPosition.az) < 0.2f && fabsf(_vehicleLocalPosition.vz) < 0.2f) {
+		if (_v_att_sp.thrust > _params.wind_thrust_max) {
+			_time_high_thrust++;
 
-		if (_time_high_thrust % 500 == 1) {
-			mavlink_log_critical(&mavlink_log_pub, "high thrust hover, land advise");
+			if (_time_high_thrust % 500 == 1) {
+				mavlink_log_critical(&mavlink_log_pub, "high thrust hover, land advise");
+			}
+		}
+
+		for (int i = 0; i < _params.sys_autostart / 1000 + 1; i++) {
+			_time_high_pwm++;
+
+			if (_actuator_outputs.output[i] > 1850.0f && _time_high_pwm % 500 == 1) {
+				mavlink_log_critical(&mavlink_log_pub, "high motor pwm");
+			}
 		}
 	}
 
-	//    PX4_INFO("actuator_outputs.output[0] =%.2f", (double)_actuator_outputs.output[0]);
-	for (int i = 0; i < _params.sys_autostart / 1000 + 1; i++) {
-		_time_high_pwm++;
-
-		if (_actuator_outputs.output[i] > 1850.0f && _time_high_pwm % 500 == 1) {
-			mavlink_log_critical(&mavlink_log_pub, "high motor pwm");
-		}
-	}
 }
 
 void
@@ -1794,6 +1818,7 @@ MulticopterAttitudeControl::task_main()
 	_mixer_switch_sub   = orb_subscribe(ORB_ID(mixer_switch));
 	_vehicleLocalPosition_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 	_actuator_outputs_sub  = orb_subscribe(ORB_ID(actuator_outputs));
+	_user_intention_sub  = orb_subscribe(ORB_ID(user_intention));
 
 	_gyro_count = math::min(orb_group_count(ORB_ID(sensor_gyro)), MAX_GYRO_COUNT);
 

@@ -126,6 +126,7 @@ set(msg_files
 	stm32_f3_cmd.msg
 	mixer_switch.msg
 	pid_auto_tune.msg
+	user_intention.msg
 	)
 
 px4_add_git_submodule(TARGET git_gencpp PATH tools/gencpp)

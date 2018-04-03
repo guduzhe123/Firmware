@@ -677,3 +677,12 @@ PARAM_DEFINE_FLOAT(MC_START_NUM, 4.0f);
  * @group Multicopter Attitude Control
  */
 PARAM_DEFINE_FLOAT(MC_WIND_THRUST, 0.7f);
+
+/**
+ * max rotating angle speed for wind detect
+ *
+ * @max 15
+ * @min 0
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_FLOAT(MC_MAX_ROTATION, 0.05f);
