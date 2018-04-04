@@ -89,6 +89,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/user_intention.h>
+#include <uORB/topics/debug_vect.h>
 #include <uORB/uORB.h>
 #include <systemlib/mavlink_log.h>
 
@@ -168,6 +169,7 @@ private:
 	orb_advert_t	_controller_status_pub;	/**< controller status publication */
 	orb_advert_t    _pid_tune_pub;         /* PID tuning publication  */
 	orb_advert_t    _wind_estimate_pub;    /* */
+	orb_advert_t    _debug_vect_pub;
 
 
 	orb_id_t _rates_sp_id;	/**< pointer to correct rates setpoint uORB metadata structure */
@@ -193,6 +195,7 @@ private:
 	struct vehicle_local_position_s				_vehicleLocalPosition;
 	struct actuator_outputs_s       _actuator_outputs;
 	struct user_intention_s             _user_intention_msg;
+	struct debug_vect_s                 _debug_vect_msg;
 
 	MultirotorMixer::saturation_status _saturation_status{};
 
@@ -430,6 +433,9 @@ private:
 
 	/* detect wind disturbance*/
 	void       wind_detect();
+
+	/* detect wind level*/
+	void       wind_level();
 };
 
 namespace mc_att_control
@@ -472,6 +478,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_controller_status_pub(nullptr),
 	_pid_tune_pub(nullptr),
 	_wind_estimate_pub(nullptr),
+	_debug_vect_pub(nullptr),
 	_rates_sp_id(nullptr),
 	_actuators_id(nullptr),
 
@@ -495,6 +502,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_vehicleLocalPosition{},
 	_actuator_outputs{},
 	_user_intention_msg{},
+	_debug_vect_msg{},
 	_saturation_status{},
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "mc_att_control")),
@@ -1705,6 +1713,63 @@ MulticopterAttitudeControl::control_attitude_rates(float dt)
 }
 
 void
+MulticopterAttitudeControl::wind_level()
+{
+	math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
+	math::Vector<3> euler_angles;
+	euler_angles = q_att.to_euler();
+
+	float roll_pitch_angle;
+	roll_pitch_angle = sqrtf(euler_angles(0) * euler_angles(0) + euler_angles(1) * euler_angles(1));
+
+	if (roll_pitch_angle * 180.0f / 3.14f > _params.wind_start_num
+	    && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 2.0f)) {
+		_wind_estimate.windlevel_horiz = 3.0f;
+
+	} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 2.0f)
+		   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 4.0f)) {
+		_wind_estimate.windlevel_horiz = 4.0f;
+
+	} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 4.0f)
+		   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 6.0f)) {
+		_time_start_wind++;
+
+		/*		if (_time_start_wind % 250 == 1 || !_time_warn) {
+					_time_warn = 1;*/
+		if (_time_start_wind % 250 == 1) {
+			mavlink_log_critical(&mavlink_log_pub, "Big wind, please fly with caution ");
+		}
+
+		_wind_estimate.windlevel_horiz = 5.0f;
+
+	} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 6.0f)) {
+		_time_start_wind++;
+
+		if (_time_start_wind % 250 == 1) {
+//		if (_time_start_wind % 250 == 1 || !_time_warn) {
+//			_time_warn = 1;
+			mavlink_log_critical(&mavlink_log_pub, "Critical wind, land advise");
+		}
+
+		_wind_estimate.windlevel_horiz = 6.0f;
+
+	} else if (roll_pitch_angle * 180.0f / 3.14f < _params.wind_start_num) {
+		_time_start_wind = 0;
+		_time_warn = 0;
+		_wind_estimate.windlevel_horiz = 2.0f;
+	}
+
+	// publish wind estimate.
+	if (_wind_estimate_pub != nullptr) {
+		orb_publish(ORB_ID(wind_estimate), _wind_estimate_pub, &_wind_estimate);
+
+	} else {
+		_wind_estimate_pub = orb_advertise(ORB_ID(wind_estimate), &_wind_estimate);
+	}
+
+}
+
+void
 MulticopterAttitudeControl::wind_detect()
 {
 	bool updated;
@@ -1714,66 +1779,56 @@ MulticopterAttitudeControl::wind_detect()
 		orb_copy(ORB_ID(user_intention), _user_intention_sub, &_user_intention_msg);
 	}
 
+	math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
+	math::Vector<3> euler_angles;
+	euler_angles = q_att.to_euler();
+
 //    PX4_INFO("user_intention_xy = %d, intention = %d, brake = %d", _user_intention_msg.user_intention_xy, _user_intention_msg.intention, _user_intention_msg.brake);
-	bool rotating = (fabsf(_v_att.rollspeed)  > _params.max_rotation) ||
-			(fabsf(_v_att.pitchspeed) > _params.max_rotation) ||
-			(fabsf(_v_att.yawspeed) > _params.max_rotation);
+	bool rotating = ((fabsf(_v_att.rollspeed)  > _params.max_rotation) ||
+			 (fabsf(_v_att.pitchspeed) > _params.max_rotation) ||
+			 (fabsf(_v_att.yawspeed) > _params.max_rotation));/* || ((fabsf(euler_angles(0))  > 0.1f) ||
+					 (fabsf(euler_angles(1)) > 0.1f));*/
 
-	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL) {
-//		if (fabsf(_manual_control_sp.x) < 0.001f  && fabsf(_manual_control_sp.y) < 0.001f) {
-		if (!_user_intention_msg.user_intention_xy && !_user_intention_msg.brake && !rotating) {
-			math::Quaternion q_att(_v_att.q[0], _v_att.q[1], _v_att.q[2], _v_att.q[3]);
-			math::Vector<3> euler_angles_sp;
-			euler_angles_sp = q_att.to_euler();
+	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION
+	    || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF
+	    || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LAND
+	    || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_FOLLOW_TARGET
+	    || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_LOITER) {
+		math::Quaternion q_sp(_v_att_sp.q_d[0], _v_att_sp.q_d[1], _v_att_sp.q_d[2], _v_att_sp.q_d[3]);
+		math::Vector<3> euler_mission_sp;
+		euler_mission_sp = q_sp.to_euler();
+		float roll_pitch_angle_sp;
+		roll_pitch_angle_sp = sqrtf(euler_mission_sp(0) * euler_mission_sp(0) + euler_mission_sp(1) * euler_mission_sp(1));
+		_debug_vect_msg.x = (float)rotating;
 
-			float roll_pitch_angle;
-			roll_pitch_angle = sqrtf(euler_angles_sp(0) * euler_angles_sp(0) + euler_angles_sp(1) * euler_angles_sp(1));
-			_time_start_wind++;
+		if (_debug_vect_pub == nullptr) {
+			_debug_vect_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect_msg);
 
-			if (roll_pitch_angle * 180.0f / 3.14f > _params.wind_start_num
-			    && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 2.0f)) {
-				_wind_estimate.windlevel_horiz = 3.0f;
+		} else {
+			orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &_debug_vect_msg);
+		}
 
-			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 2.0f)
-				   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 4.0f)) {
-				_wind_estimate.windlevel_horiz = 4.0f;
-
-			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 4.0f)
-				   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 6.0f)) {
-				if (_time_start_wind % 250 == 1 || !_time_warn) {
-					_time_warn = 1;
-					mavlink_log_critical(&mavlink_log_pub, "Big wind, please fly with caution ");
-				}
-
-				_wind_estimate.windlevel_horiz = 5.0f;
-
-			} else if (roll_pitch_angle * 180.0f / 3.14f > (_params.wind_start_num + 6.0f)) {
-				if (_time_start_wind % 250 == 1 || !_time_warn) {
-					_time_warn = 1;
-					mavlink_log_critical(&mavlink_log_pub, "Critical wind, land advise");
-				}
-
-				_wind_estimate.windlevel_horiz = 6.0f;
-
-			} else if (roll_pitch_angle * 180.0f / 3.14f < _params.wind_start_num) {
-				_time_start_wind = 0;
-				_time_warn = 0;
-				_wind_estimate.windlevel_horiz = 2.0f;
-			}
-
-			// publish wind estimate.
-			if (_wind_estimate_pub != nullptr) {
-				orb_publish(ORB_ID(wind_estimate), _wind_estimate_pub, &_wind_estimate);
-
-			} else {
-				_wind_estimate_pub = orb_advertise(ORB_ID(wind_estimate), &_wind_estimate);
-			}
-
+		// if roll pitch setpoint is small, check the real roll pitch angle.
+		if ((roll_pitch_angle_sp * 180.0f / 3.14f) < 2.0f && !rotating) {
+			wind_level();
 		}
 	}
 
-	// TODO check if thrust or PWM of motors is so high that the uav cannot finish the mission.
-	if (_vehicleLocalPosition.z_valid && fabsf(_vehicleLocalPosition.az) < 0.2f && fabsf(_vehicleLocalPosition.vz) < 0.2f) {
+	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL) {
+		// TODO check if we detect wind when rotating or not rotating.
+		// !_user_intention_msg.user_intention_xy means we detect wind when the drone is braked when we don't give any commander.
+		// !_user_intention_msg.brake means we don't detect wind when the drone is braking when the manual sticks goes to the middle.
+		// !rotating means we don't detect wind when the drone is rotating when we check flight mode from manual to position.
+		// SO the condition we detect wind when we don't give any commander thought GCS/RC or the drone isn't braking or rotating.
+		// The level of wind is determined by the angle of the multirotor at that condition;
+		if (!_user_intention_msg.user_intention_xy && !_user_intention_msg.brake && !rotating) {
+			wind_level();
+		}
+	}
+
+	// check if thrust or PWM of motors is so high that the uav cannot finish the mission.
+	if (_vehicleLocalPosition.z_valid && fabsf(_vehicleLocalPosition.az) < 0.2f &&
+	    fabsf(_vehicleLocalPosition.vz) < 0.2f) {
 		if (_v_att_sp.thrust > _params.wind_thrust_max) {
 			_time_high_thrust++;
 
@@ -1790,7 +1845,6 @@ MulticopterAttitudeControl::wind_detect()
 			}
 		}
 	}
-
 }
 
 void
@@ -1802,7 +1856,6 @@ MulticopterAttitudeControl::task_main_trampoline(int argc, char *argv[])
 void
 MulticopterAttitudeControl::task_main()
 {
-
 	/*
 	 * do subscriptions
 	 */
