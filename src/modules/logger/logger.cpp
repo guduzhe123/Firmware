@@ -584,6 +584,7 @@ void Logger::add_default_topics()
 	add_topic("airspeed", 200);
 	add_topic("att_pos_mocap", 50);
 	add_topic("battery_status", 500);
+	add_topic("battery_status_2", 500);
 	add_topic("camera_capture");
 	add_topic("camera_trigger");
 	add_topic("cpuload");
@@ -616,7 +617,10 @@ void Logger::add_default_topics()
 	add_topic("vehicle_vision_attitude");
 	add_topic("vehicle_vision_position");
 	add_topic("vtol_vehicle_status", 200);
-	add_topic("wind_estimate", 200);
+    add_topic("wind_estimate", 200);
+    add_topic("pid_auto_tune", 200);
+
+//    add_topic("debug_key_value");
 }
 
 void Logger::add_high_rate_topics()

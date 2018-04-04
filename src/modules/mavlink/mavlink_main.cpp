@@ -2055,6 +2055,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("CAMERA_IMAGE_CAPTURED");
 		configure_stream("STM32F3_CMD", 5.0f);
 		configure_stream("PID_AUTO_TUNE", 10.0f);
+
 		break;
 
 	case MAVLINK_MODE_ONBOARD:

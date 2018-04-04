@@ -142,6 +142,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_stm32_cmd_pub(nullptr),
 	_stm32_motor_curr_pub(nullptr),
 	_pid_auto_tune_pub(nullptr),
+	_battery_status_2_pub(nullptr),
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_actuator_armed_sub(orb_subscribe(ORB_ID(actuator_armed))),
 	_global_ref_timestamp(0),
@@ -349,6 +350,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 
 	case MAVLINK_MSG_ID_PID_AUTO_TUNE:
 		handle_message_pid_auto_tune(msg);
+		break;
+
+	case MAVLINK_MSG_ID_BATTERY_STATUS_2:
+		handle_message_battery_status_2(msg);
 		break;
 
 	default:
@@ -1359,6 +1364,7 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 	// external battery measurements
 	mavlink_battery_status_t battery_mavlink;
 	mavlink_msg_battery_status_decode(msg, &battery_mavlink);
+//    PX4_INFO("battery_mavlink.id = %d", battery_mavlink.id);
 
 	battery_status_s battery_status = {};
 	battery_status.timestamp = hrt_absolute_time();
@@ -1414,6 +1420,71 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 
 	int instance;
 	orb_publish_auto(ORB_ID(battery_status), &_battery_pub, &battery_status, &instance, ORB_PRIO_HIGH);
+}
+
+void
+MavlinkReceiver::handle_message_battery_status_2(mavlink_message_t *msg)
+{
+	// external battery measurements
+	mavlink_battery_status_2_t battery_mavlink;
+	mavlink_msg_battery_status_2_decode(msg, &battery_mavlink);
+//    PX4_INFO("battery_mavlink.id = %d", battery_mavlink.id);
+
+	battery_status_2_s battery_status = {};
+	battery_status.timestamp = hrt_absolute_time();
+
+	for (int i = 0; i < 10; i ++) {
+		if (battery_mavlink.voltages[i] == 0) {
+			battery_mavlink.voltages[i] = UINT16_MAX;
+		}
+	}
+
+	float voltage_sum = 0.0f;
+	uint8_t cell_count = 0;
+
+	while (battery_mavlink.voltages[cell_count] < UINT16_MAX  && cell_count < 10) {
+		voltage_sum += (float)(battery_mavlink.voltages[cell_count]) / 1000.0f;
+		cell_count++;
+	}
+
+	// Get the battery level thresholds.
+	float bat_emergen_thr;
+	float bat_crit_thr;
+	float bat_low_thr;
+	param_get(_p_bat_emergen_thr, &bat_emergen_thr);
+	param_get(_p_bat_crit_thr, &bat_crit_thr);
+	param_get(_p_bat_low_thr, &bat_low_thr);
+
+	battery_status.timestamp = hrt_absolute_time();
+	battery_status.voltage_v = voltage_sum;
+
+	battery_status.voltage_filtered_v  = (float)(battery_mavlink.voltages[0]) / 1000.0f;
+	battery_status.current_a = (float)(battery_mavlink.current_battery);
+	battery_status.current_filtered_a = battery_status.current_a;
+	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
+	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
+	battery_status.cell_count = cell_count;
+	battery_status.connected = true;
+	battery_status.id = battery_mavlink.id;
+	battery_status.type = battery_mavlink.type;
+	battery_status.function = battery_mavlink.battery_function;
+	battery_status.temperature = battery_mavlink.temperature;
+
+	// Set the battery warning based on remaining charge.
+	//  Note: Smallest values must come first in evaluation.
+	if (battery_status.remaining < bat_emergen_thr) {
+		battery_status.warning = battery_status_2_s::BATTERY_WARNING_EMERGENCY;
+
+	} else if (battery_status.remaining < bat_crit_thr) {
+		battery_status.warning = battery_status_2_s::BATTERY_WARNING_CRITICAL;
+
+	} else if (battery_status.remaining < bat_low_thr) {
+		battery_status.warning = battery_status_2_s::BATTERY_WARNING_LOW;
+	}
+
+//   battery_status = {};
+	int instance;
+	orb_publish_auto(ORB_ID(battery_status_2), &_battery_status_2_pub, &battery_status, &instance, ORB_PRIO_HIGH);
 }
 
 void
