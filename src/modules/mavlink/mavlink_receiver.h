@@ -288,6 +288,8 @@ private:
 
 	uint8_t _mom_switch_pos[MOM_SWITCH_COUNT];
 	uint16_t _mom_switch_state;
+	uint16_t _time_stm32;
+	mavlink_stm32_f3_command_t stm32_f3_msg_last;
 
 	param_t _p_bat_emergen_thr;
 	param_t _p_bat_crit_thr;

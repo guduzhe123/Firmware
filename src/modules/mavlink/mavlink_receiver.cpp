@@ -160,6 +160,8 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_orb_class_instance(-1),
 	_mom_switch_pos{},
 	_mom_switch_state(0),
+	_time_stm32(0),
+	stm32_f3_msg_last{},
 	_p_bat_emergen_thr(param_find("BAT_EMERGEN_THR")),
 	_p_bat_crit_thr(param_find("BAT_CRIT_THR")),
 	_p_bat_low_thr(param_find("BAT_LOW_THR"))
@@ -341,6 +343,7 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		break;
 
 	case MAVLINK_MSG_ID_STM32_F3_COMMAND:
+		_time_stm32++;
 		handle_message_stm32_cmd(msg);
 		break;
 
@@ -1557,12 +1560,21 @@ MavlinkReceiver::handle_message_stm32_cmd(mavlink_message_t *msg)
 	mavlink_stm32_f3_command_t stm32_f3_msg;
 	mavlink_msg_stm32_f3_command_decode(msg, &stm32_f3_msg);
 
-	mavlink_log_critical(&mavlink_log_pub, " %d,  %d,  %s", stm32_f3_msg.command, stm32_f3_msg.param,
-			     stm32_f3_msg.f3_log);
+//    PX4_INFO("_time_stm32 = %d", _time_stm32);
+	if (stm32_f3_msg_last.command != stm32_f3_msg.command || stm32_f3_msg_last.param != stm32_f3_msg.param) {
+		stm32_f3_msg_last = stm32_f3_msg;
+		_time_stm32 = 1;
+	}
+
+	if (_time_stm32 % 3 == 1) {
+		mavlink_log_critical(&mavlink_log_pub, " %d,  %d,  %s", stm32_f3_msg.command, stm32_f3_msg.param,
+				     stm32_f3_msg.f3_log);
+	}
 
 	struct stm32_f3_cmd_s orb_msg;
 
 	orb_msg.command = stm32_f3_msg.command;
+
 	orb_msg.param = stm32_f3_msg.param;
 
 	strcpy(orb_msg.f3_log, stm32_f3_msg.f3_log);
