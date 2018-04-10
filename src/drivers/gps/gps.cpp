@@ -76,6 +76,7 @@
 #include <drivers/drv_gps.h>
 #include <uORB/uORB.h>
 #include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/vehicle_gps_2_position.h>
 #include <uORB/topics/satellite_info.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/gps_dump.h>
@@ -158,7 +159,9 @@ private:
 	GPSHelper			*_helper;					///< instance of GPS parser
 	GPS_Sat_Info			*_sat_info;					///< instance of GPS sat info data object
 	struct vehicle_gps_position_s	_report_gps_pos;				///< uORB topic for gps position
+	struct vehicle_gps_position_s	_report_secondary_gps_pos;				///< uORB topic for secondary gps position
 	orb_advert_t			_report_gps_pos_pub;				///< uORB pub for gps position
+	orb_advert_t			_report_secondary_gps_pos_pub;				///< uORB pub for secondary gps position
 	int					_gps_orb_instance;				///< uORB multi-topic instance
 	struct satellite_info_s		*_p_report_sat_info;				///< pointer to uORB topic for satellite info
 	int					_gps_sat_orb_instance;				///< uORB multi-topic instance for satellite info
@@ -177,6 +180,7 @@ private:
 
 	static volatile bool _is_gps_main_advertised; ///< for the second gps we want to make sure that it gets instance 1
 	/// and thus we wait until the first one publishes at least one message.
+	static volatile bool _is_gps_secondary_advertised;
 	static volatile GPS *_secondary_instance;
 
 
@@ -253,6 +257,7 @@ private:
 };
 
 volatile bool GPS::_is_gps_main_advertised = false;
+volatile bool GPS::_is_gps_secondary_advertised = false;
 volatile GPS *GPS::_secondary_instance = nullptr;
 
 /*
@@ -271,7 +276,9 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 	_helper(nullptr),
 	_sat_info(nullptr),
 	_report_gps_pos{},
+	_report_secondary_gps_pos{},
 	_report_gps_pos_pub(nullptr),
+	_report_secondary_gps_pos_pub(nullptr),
 	_gps_orb_instance(-1),
 	_p_report_sat_info(nullptr),
 	_report_sat_info_pub(nullptr),
@@ -902,6 +909,7 @@ GPS::print_status()
 	if (_instance == Instance::Main && _secondary_instance) {
 		GPS *secondary_instance = (GPS *)_secondary_instance;
 		secondary_instance->print_status();
+		_is_gps_secondary_advertised = true;
 	}
 
 	return 0;
@@ -914,6 +922,15 @@ GPS::publish()
 		orb_publish_auto(ORB_ID(vehicle_gps_position), &_report_gps_pos_pub, &_report_gps_pos, &_gps_orb_instance,
 				 ORB_PRIO_DEFAULT);
 		_is_gps_main_advertised = true;
+
+	}
+
+	if (_is_gps_secondary_advertised) {
+		// publish gps info for the secondary gps
+		orb_publish_auto(ORB_ID(vehicle_gps_2_position), &_report_secondary_gps_pos_pub, &_report_gps_pos,
+				 &_gps_orb_instance,
+				 ORB_PRIO_DEFAULT);
+		_is_gps_secondary_advertised = false;
 	}
 }
 
@@ -1018,8 +1035,8 @@ void GPS::run_trampoline_secondary(int argc, char *argv[])
 	GPS *gps = instantiate(argc, argv, Instance::Secondary);
 	if (gps) {
 		_secondary_instance = gps;
+        _is_gps_secondary_advertised = true;
 		gps->run();
-
 		_secondary_instance = nullptr;
 		delete gps;
 	}

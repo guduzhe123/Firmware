@@ -414,9 +414,16 @@ then
 		if ver hwcmp PX4_SAME70XPLAINED_V1
 		then
 			gps start -d /dev/ttyS2
+        fi
+
+		if param compare SYS_DUAL_GPS 1
+		then
+		    gps start -d /dev/ttyS3 -e /dev/ttyS6
+
 		else
 			gps start
 		fi
+
 		sh /etc/init.d/rc.sensors
 		commander start
 	fi

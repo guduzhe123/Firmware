@@ -49,6 +49,7 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/vehicle_gps_position.h>
+#include <uORB/topics/vehicle_gps_2_position.h>
 #include <uORB/topics/vehicle_command_ack.h>
 
 #include <drivers/drv_hrt.h>
@@ -609,6 +610,7 @@ void Logger::add_default_topics()
 	add_topic("vehicle_command");
 	add_topic("vehicle_global_position", 200);
 	add_topic("vehicle_gps_position");
+	add_topic("vehicle_gps_2_position",100);
 	add_topic("vehicle_land_detected");
 	add_topic("vehicle_local_position", 100);
 	add_topic("vehicle_local_position_setpoint", 100);
@@ -654,6 +656,7 @@ void Logger::add_estimator_replay_topics()
 	add_topic("sensor_combined");
 	add_topic("sensor_selection");
 	add_topic("vehicle_gps_position");
+    add_topic("vehicle_gps_position_2");
 	add_topic("vehicle_land_detected");
 	add_topic("vehicle_status");
 	add_topic("vehicle_vision_attitude");

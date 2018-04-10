@@ -242,3 +242,14 @@ PARAM_DEFINE_INT32(SYS_CAL_TMIN, 5);
  * @group System
  */
 PARAM_DEFINE_INT32(SYS_CAL_TMAX, 10);
+
+/**
+ *  Dual GPS
+ *
+ * Define to use dual gps or not.
+ *
+ * @min 0
+ * @max 1
+ * @group System
+ */
+PARAM_DEFINE_INT32(SYS_DUAL_GPS, 0);
