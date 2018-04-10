@@ -1178,10 +1178,7 @@ MulticopterPositionControl::set_manual_acceleration_z(float &max_acceleration, c
 		_acceleration_state_dependent_z = _acceleration_z_max_down.get();
 
 		/* reset slew rate */
-		if (_params.smooth_disable) {
-			_vel_sp_prev(2) = _vel_sp(2);
-
-		} else {
+		if (!_params.smooth_disable) {
 			_vel_sp_prev(2) = _vel(2);
 		}
 
@@ -1298,7 +1295,6 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 
 		}
 
-		PX4_INFO("brake");
 
 		_user_intention_msg.brake = true;
 
