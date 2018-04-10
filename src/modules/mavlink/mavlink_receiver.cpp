@@ -1557,11 +1557,13 @@ MavlinkReceiver::handle_message_stm32_cmd(mavlink_message_t *msg)
 	mavlink_stm32_f3_command_t stm32_f3_msg;
 	mavlink_msg_stm32_f3_command_decode(msg, &stm32_f3_msg);
 
-	mavlink_log_critical(&mavlink_log_pub, "%d: %s", stm32_f3_msg.command, stm32_f3_msg.f3_log);
+	mavlink_log_critical(&mavlink_log_pub, " %d,  %d,  %s", stm32_f3_msg.command, stm32_f3_msg.param,
+			     stm32_f3_msg.f3_log);
 
 	struct stm32_f3_cmd_s orb_msg;
 
 	orb_msg.command = stm32_f3_msg.command;
+	orb_msg.param = stm32_f3_msg.param;
 
 	strcpy(orb_msg.f3_log, stm32_f3_msg.f3_log);
 
