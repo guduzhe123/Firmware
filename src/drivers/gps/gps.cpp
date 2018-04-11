@@ -923,14 +923,17 @@ GPS::publish()
 				 ORB_PRIO_DEFAULT);
 		_is_gps_main_advertised = true;
 
+//        PX4_INFO("main _report_gps_pos.eph = %.2f", (double)_report_gps_pos.eph);
 	}
 
-	if (_is_gps_secondary_advertised) {
+	if (_instance == Instance::Secondary || _is_gps_secondary_advertised) {
 		// publish gps info for the secondary gps
 		orb_publish_auto(ORB_ID(vehicle_gps_2_position), &_report_secondary_gps_pos_pub, &_report_gps_pos,
 				 &_gps_orb_instance,
 				 ORB_PRIO_DEFAULT);
 		_is_gps_secondary_advertised = false;
+//        PX4_INFO("_report_gps_pos = %d", _report_gps_pos);
+//        PX4_INFO("second _report_gps_pos.eph = %.2f", (double)_report_gps_pos.eph);
 	}
 }
 
