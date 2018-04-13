@@ -80,6 +80,7 @@
 #include <uORB/topics/satellite_info.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/gps_dump.h>
+#include <uORB/topics/vehicle_status_flags.h>
 
 #include <board_config.h>
 
@@ -91,6 +92,7 @@
 #define TIMEOUT_5HZ 500
 #define RATE_MEASUREMENT_PERIOD 5000000
 #define GPS_WAIT_BEFORE_READ	20		// ms, wait before reading to save read() calls
+#define GPS_MAIN_LOST_TIME    5
 
 
 /* struct for dynamic allocation of satellite info data */
@@ -171,6 +173,10 @@ private:
 	unsigned			_last_rate_rtcm_injection_count; 		///< counter for number of RTCM messages
 	bool				_fake_gps;					///< fake gps output
 	Instance 			_instance;
+	struct vehicle_status_flags_s   status_flags;
+	int status_flags_sub;
+	/*    bool                _main_gps_heath;
+	    bool                _second_gps_heath;*/
 
 	int _orb_inject_data_fd;
 
@@ -182,6 +188,9 @@ private:
 	/// and thus we wait until the first one publishes at least one message.
 	static volatile bool _is_gps_secondary_advertised;
 	static volatile GPS *_secondary_instance;
+	static volatile bool _main_gps_heath;
+	static volatile bool _second_gps_heath;
+	static volatile int _timer;
 
 
 	/**
@@ -259,6 +268,9 @@ private:
 volatile bool GPS::_is_gps_main_advertised = false;
 volatile bool GPS::_is_gps_secondary_advertised = false;
 volatile GPS *GPS::_secondary_instance = nullptr;
+volatile bool GPS::_main_gps_heath = false;
+volatile bool GPS::_second_gps_heath = false;
+volatile int GPS::_timer = 0;
 
 /*
  * Driver 'main' command.
@@ -287,6 +299,8 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 	_last_rate_rtcm_injection_count(0),
 	_fake_gps(fake_gps),
 	_instance(instance),
+	status_flags{},
+	status_flags_sub(-1),
 	_orb_inject_data_fd(-1),
 	_dump_communication_pub(nullptr),
 	_dump_to_device(nullptr),
@@ -636,6 +650,7 @@ GPS::run()
 	}
 
 	_orb_inject_data_fd = orb_subscribe(ORB_ID(gps_inject_data));
+	status_flags_sub = orb_subscribe(ORB_ID(vehicle_status_flags));
 
 	initializeCommunicationDump();
 
@@ -918,12 +933,48 @@ GPS::print_status()
 void
 GPS::publish()
 {
+//    PX4_INFO("_main_gps_heath = %d, _second_gps_heath = %d", _main_gps_heath, _second_gps_heath);
+//    PX4_INFO("_instance = %d", _instance);
+//	status_flags_sub = orb_subscribe(ORB_ID(vehicle_status_flags));
+	PX4_INFO("gps_failure = %d", status_flags.other_flags);
+	bool updated;
+	orb_check(status_flags_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_status_flags), status_flags_sub, &status_flags);
+		PX4_INFO("gps_failure = %d", status_flags.other_flags);
+	}
+
+//	PX4_INFO("gps_failure = %d",status_flags.other_flags);
+
+//    _is_gps_main_advertised = false;
 	if (_instance == Instance::Main || _is_gps_main_advertised) {
 		orb_publish_auto(ORB_ID(vehicle_gps_position), &_report_gps_pos_pub, &_report_gps_pos, &_gps_orb_instance,
 				 ORB_PRIO_DEFAULT);
 		_is_gps_main_advertised = true;
-
+		_timer = 0;
 //        PX4_INFO("main _report_gps_pos.eph = %.2f", (double)_report_gps_pos.eph);
+	}
+
+//	PX4_INFO("_is_gps_main_advertised = %d", _is_gps_main_advertised);
+
+	if (!_is_gps_main_advertised) {
+		_timer++;
+//		PX4_INFO("_timer = %d", _timer);
+
+		/*		if (_timer > GPS_MAIN_LOST_TIME) {
+					if (_report_gps_pos_pub != nullptr) {
+						orb_publish(ORB_ID(vehicle_gps_position), _report_gps_pos_pub, &_report_gps_pos);
+						PX4_INFO("published!");
+
+					} else {
+						_report_gps_pos_pub = orb_advertise(ORB_ID(vehicle_gps_position), &_report_gps_pos);
+
+					}
+				}*/
+		orb_publish_auto(ORB_ID(vehicle_gps_position), &_report_gps_pos_pub, &_report_gps_pos, 0,
+				 ORB_PRIO_DEFAULT);
+
 	}
 
 	if (_instance == Instance::Secondary || _is_gps_secondary_advertised) {
@@ -932,9 +983,13 @@ GPS::publish()
 				 &_gps_orb_instance,
 				 ORB_PRIO_DEFAULT);
 		_is_gps_secondary_advertised = false;
+		_is_gps_main_advertised = false;
+//        PX4_INFO("second_gps_orb_instance = %d", _gps_orb_instance);
 //        PX4_INFO("_report_gps_pos = %d", _report_gps_pos);
 //        PX4_INFO("second _report_gps_pos.eph = %.2f", (double)_report_gps_pos.eph);
+
 	}
+
 }
 
 void

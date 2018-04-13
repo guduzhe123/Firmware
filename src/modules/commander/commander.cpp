@@ -4978,6 +4978,7 @@ void publish_status_flags(orb_advert_t &vehicle_status_flags_pub) {
 		v_flags.other_flags |= vehicle_status_flags_s::EVER_HAD_BAROMETER_DATA_MASK;
 	}
 
+    PX4_INFO("other_flags = %d", v_flags.other_flags);
 	/* publish vehicle_status_flags */
 	if (vehicle_status_flags_pub != nullptr) {
 		orb_publish(ORB_ID(vehicle_status_flags), vehicle_status_flags_pub, &v_flags);
