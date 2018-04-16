@@ -164,6 +164,7 @@ private:
 	struct vehicle_gps_position_s	_report_secondary_gps_pos;				///< uORB topic for secondary gps position
 	orb_advert_t			_report_gps_pos_pub;				///< uORB pub for gps position
 	orb_advert_t			_report_secondary_gps_pos_pub;				///< uORB pub for secondary gps position
+	orb_advert_t			_report_gps_pos_pub_safe;				///< uORB pub for gps position
 	int					_gps_orb_instance;				///< uORB multi-topic instance
 	struct satellite_info_s		*_p_report_sat_info;				///< pointer to uORB topic for satellite info
 	int					_gps_sat_orb_instance;				///< uORB multi-topic instance for satellite info
@@ -175,8 +176,8 @@ private:
 	Instance 			_instance;
 	struct vehicle_status_flags_s   status_flags;
 	int status_flags_sub;
-	/*    bool                _main_gps_heath;
-	    bool                _second_gps_heath;*/
+	/*    bool                _main_gps_healthy;
+	    bool                _second_gps_healthy;*/
 
 	int _orb_inject_data_fd;
 
@@ -188,8 +189,8 @@ private:
 	/// and thus we wait until the first one publishes at least one message.
 	static volatile bool _is_gps_secondary_advertised;
 	static volatile GPS *_secondary_instance;
-	static volatile bool _main_gps_heath;
-	static volatile bool _second_gps_heath;
+	static volatile bool _main_gps_healthy;
+	static volatile bool _second_gps_healthy;
 	static volatile int _timer;
 
 
@@ -268,8 +269,8 @@ private:
 volatile bool GPS::_is_gps_main_advertised = false;
 volatile bool GPS::_is_gps_secondary_advertised = false;
 volatile GPS *GPS::_secondary_instance = nullptr;
-volatile bool GPS::_main_gps_heath = false;
-volatile bool GPS::_second_gps_heath = false;
+volatile bool GPS::_main_gps_healthy = false;
+volatile bool GPS::_second_gps_healthy = false;
 volatile int GPS::_timer = 0;
 
 /*
@@ -291,6 +292,7 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 	_report_secondary_gps_pos{},
 	_report_gps_pos_pub(nullptr),
 	_report_secondary_gps_pos_pub(nullptr),
+	_report_gps_pos_pub_safe(nullptr),
 	_gps_orb_instance(-1),
 	_p_report_sat_info(nullptr),
 	_report_sat_info_pub(nullptr),
@@ -788,12 +790,27 @@ GPS::run()
 //						PX4_WARN("module found: %s", mode_str);
 						_healthy = true;
 					}
+
+					if (_instance == Instance::Main) {
+						_main_gps_healthy = _healthy;
+						_timer = 0;
+
+					} else if (_instance == Instance::Secondary) {
+						_second_gps_healthy = _healthy;
+					}
 				}
 
 				if (_healthy) {
 					_healthy = false;
 					_rate = 0.0f;
 					_rate_rtcm_injection = 0.0f;
+
+					if (_instance == Instance::Main) {
+						_main_gps_healthy = _healthy;
+
+					} else if (_instance == Instance::Secondary) {
+						_second_gps_healthy = _healthy;
+					}
 				}
 			}
 
@@ -933,60 +950,37 @@ GPS::print_status()
 void
 GPS::publish()
 {
-//    PX4_INFO("_main_gps_heath = %d, _second_gps_heath = %d", _main_gps_heath, _second_gps_heath);
-//    PX4_INFO("_instance = %d", _instance);
-//	status_flags_sub = orb_subscribe(ORB_ID(vehicle_status_flags));
-	PX4_INFO("gps_failure = %d", status_flags.other_flags);
 	bool updated;
 	orb_check(status_flags_sub, &updated);
 
 	if (updated) {
 		orb_copy(ORB_ID(vehicle_status_flags), status_flags_sub, &status_flags);
-		PX4_INFO("gps_failure = %d", status_flags.other_flags);
 	}
 
-//	PX4_INFO("gps_failure = %d",status_flags.other_flags);
-
-//    _is_gps_main_advertised = false;
 	if (_instance == Instance::Main || _is_gps_main_advertised) {
 		orb_publish_auto(ORB_ID(vehicle_gps_position), &_report_gps_pos_pub, &_report_gps_pos, &_gps_orb_instance,
 				 ORB_PRIO_DEFAULT);
 		_is_gps_main_advertised = true;
-		_timer = 0;
-//        PX4_INFO("main _report_gps_pos.eph = %.2f", (double)_report_gps_pos.eph);
+
 	}
 
-//	PX4_INFO("_is_gps_main_advertised = %d", _is_gps_main_advertised);
 
-	if (!_is_gps_main_advertised) {
+	if (!_main_gps_healthy && _second_gps_healthy & _is_gps_main_advertised) {
 		_timer++;
-//		PX4_INFO("_timer = %d", _timer);
 
-		/*		if (_timer > GPS_MAIN_LOST_TIME) {
-					if (_report_gps_pos_pub != nullptr) {
-						orb_publish(ORB_ID(vehicle_gps_position), _report_gps_pos_pub, &_report_gps_pos);
-						PX4_INFO("published!");
-
-					} else {
-						_report_gps_pos_pub = orb_advertise(ORB_ID(vehicle_gps_position), &_report_gps_pos);
-
-					}
-				}*/
-		orb_publish_auto(ORB_ID(vehicle_gps_position), &_report_gps_pos_pub, &_report_gps_pos, 0,
-				 ORB_PRIO_DEFAULT);
+		if (_timer > GPS_MAIN_LOST_TIME) {
+			orb_publish_auto(ORB_ID(vehicle_gps_position), &_report_gps_pos_pub_safe, &_report_gps_pos, 0,
+					 ORB_PRIO_DEFAULT);
+		}
 
 	}
 
-	if (_instance == Instance::Secondary || _is_gps_secondary_advertised) {
-		// publish gps info for the secondary gps
+
+	if ((_instance == Instance::Secondary || _is_gps_secondary_advertised)) {
 		orb_publish_auto(ORB_ID(vehicle_gps_2_position), &_report_secondary_gps_pos_pub, &_report_gps_pos,
 				 &_gps_orb_instance,
 				 ORB_PRIO_DEFAULT);
 		_is_gps_secondary_advertised = false;
-		_is_gps_main_advertised = false;
-//        PX4_INFO("second_gps_orb_instance = %d", _gps_orb_instance);
-//        PX4_INFO("_report_gps_pos = %d", _report_gps_pos);
-//        PX4_INFO("second _report_gps_pos.eph = %.2f", (double)_report_gps_pos.eph);
 
 	}
 
