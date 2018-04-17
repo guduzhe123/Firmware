@@ -306,6 +306,7 @@ private:
 
 		param_t board_offset[3];
 		param_t mc_pid_autotune;
+		param_t mc_pid_adjust;
 		param_t mc_pid_axis;
 		param_t mc_pid_angle_rp;
 		param_t mc_pid_angle_y;
@@ -361,6 +362,7 @@ private:
 		float board_offset[3];
 
 		int mc_pid_autotune;
+		int mc_pid_adjust;
 		int mc_pid_axis;
 		float mc_pid_angle_rp;
 		float mc_pid_angle_y;
@@ -538,6 +540,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params.board_offset[2] = 0.0f;
 
 	_params.mc_pid_autotune = 0;
+	_params.mc_pid_adjust = 0;
 
 	_rates_prev.zero();
 	_rates_sp.zero();
@@ -635,6 +638,7 @@ MulticopterAttitudeControl::MulticopterAttitudeControl() :
 	_params_handles.board_offset[2]		=	param_find("SENS_BOARD_Z_OFF");
 
 	_params_handles.mc_pid_autotune = param_find("MC_PID_AUTOTUNE");
+	_params_handles.mc_pid_adjust = param_find("MC_PID_ADJUST");
 	_params_handles.mc_pid_axis = param_find("MC_PID_AXIS");
 	_params_handles.mc_pid_angle_rp = param_find("MC_PID_ANGLE_RP");
 	_params_handles.mc_pid_angle_y = param_find("MC_PID_ANGLE_Y");
@@ -860,6 +864,7 @@ MulticopterAttitudeControl::parameters_update()
 					 M_DEG_TO_RAD_F * _params.board_offset[2]);
 	_board_rotation = board_rotation_offset * _board_rotation;
 	param_get(_params_handles.mc_pid_autotune, &(_params.mc_pid_autotune));
+	param_get(_params_handles.mc_pid_adjust, &(_params.mc_pid_adjust));
 	param_get(_params_handles.mc_pid_axis, &(_params.mc_pid_axis));
 	param_get(_params_handles.mc_pid_angle_rp, &(_params.mc_pid_angle_rp));
 	param_get(_params_handles.mc_pid_angle_y, &(_params.mc_pid_angle_y));
@@ -1422,26 +1427,23 @@ MulticopterAttitudeControl::control_attitude(float dt)
 
 	// failsafe program.  Reset all PID parameters to the default if turns to manual mode or RTL.
 	if ((_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_MANUAL
-	     || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_RTL) && _params.mc_pid_autotune == 1) {
-		if (_params.mc_pid_axis == 1 || _params.mc_pid_axis == 2) {
-			_params.att_p(0) = 6.5f;
-			_params.rate_p(0) = 0.15f;
-			_params.rate_i(0) = 0.05f;
-			_params.rate_d(0) = 0.003f;
+	     || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_RTL) && _params.mc_pid_adjust == 1) {
+		PX4_INFO("run");
+		_params.att_p(0) = 6.5f;
+		_params.rate_p(0) = 0.15f;
+		_params.rate_i(0) = 0.05f;
+		_params.rate_d(0) = 0.003f;
 
-		} else if (_params.mc_pid_axis == 3 || _params.mc_pid_axis == 4) {
-			_params.att_p(1) = 6.5f;
-			_params.rate_p(1) = 0.15f;
-			_params.rate_i(1) = 0.05f;
-			_params.rate_d(1) = 0.003f;
+		_params.att_p(1) = 6.5f;
+		_params.rate_p(1) = 0.15f;
+		_params.rate_i(1) = 0.05f;
+		_params.rate_d(1) = 0.003f;
 
-		} else if (_params.mc_pid_axis == 5 || _params.mc_pid_axis == 6) {
-			_params.att_p(2) = 2.8f;
-			_params.rate_p(2) = 0.2f;
-			_params.rate_i(2) = 0.1f;
-			_params.rate_d(2) = 0.00f;
-			_params.rate_ff(2) = 0.0f;
-		}
+		_params.att_p(2) = 2.8f;
+		_params.rate_p(2) = 0.2f;
+		_params.rate_i(2) = 0.1f;
+		_params.rate_d(2) = 0.00f;
+		_params.rate_ff(2) = 0.0f;
 	} // failsafe program.
 
 	if (_params.mc_pid_autotune && (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_POSCTL

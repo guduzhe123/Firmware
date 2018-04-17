@@ -629,6 +629,17 @@ PARAM_DEFINE_INT32(MC_PID_AUTOTUNE, 0);
 PARAM_DEFINE_INT32(MC_PID_AXIS, 0);
 
 /**
+ * PID adjustice
+ *
+ * 0 for disable this function, 1 for enable
+ *
+ * @min 0
+ * @max 1
+ * @group Multicopter Attitude Control
+ */
+PARAM_DEFINE_INT32(MC_PID_ADJUST, 0);
+
+/**
  * PID autotune roll pitch angle setpoint
  *
  * 0 ~ 2*pi degree
