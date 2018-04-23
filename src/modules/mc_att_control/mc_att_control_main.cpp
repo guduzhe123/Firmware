@@ -1428,7 +1428,6 @@ MulticopterAttitudeControl::control_attitude(float dt)
 	// failsafe program.  Reset all PID parameters to the default if turns to manual mode or RTL.
 	if ((_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_MANUAL
 	     || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_RTL) && _params.mc_pid_adjust == 1) {
-		PX4_INFO("run");
 		_params.att_p(0) = 6.5f;
 		_params.rate_p(0) = 0.15f;
 		_params.rate_i(0) = 0.05f;
