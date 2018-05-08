@@ -651,7 +651,7 @@ PARAM_DEFINE_FLOAT(MC_PID_ANGLE_RP, 5);
 /**
  * PID autotune yaw angle setpoint
  *
- * 0 ~ 2*pi degree
+ * 0 ~ 360 degree
  *
  * @group Multicopter Attitude Control
  */
@@ -674,17 +674,19 @@ PARAM_DEFINE_INT32(MC_PID_TIME, 2000);
 PARAM_DEFINE_INT32(MC_WIND_DET, 0);
 
 /**
- * wind detect
+ * wind detect: wind level start.
  *
- * 0 disable this function, 1 enable this function
+ * @max 8.0
+ * @min 0.0
  * @group Multicopter Attitude Control
  */
 PARAM_DEFINE_FLOAT(MC_START_NUM, 4.0f);
 
 /**
- * wind detect
+ * wind detect: max allowable hover thrust. If bigger than that, the QGC will warn.
  *
- * 0 disable this function, 1 enable this function
+ * @max 0.9
+ * @min 0.6
  * @group Multicopter Attitude Control
  */
 PARAM_DEFINE_FLOAT(MC_WIND_THRUST, 0.7f);
@@ -692,7 +694,7 @@ PARAM_DEFINE_FLOAT(MC_WIND_THRUST, 0.7f);
 /**
  * max rotating angle speed for wind detect
  *
- * @max 15
+ * @max 1
  * @min 0
  * @group Multicopter Attitude Control
  */

@@ -1213,7 +1213,7 @@ void Ekf2::run()
 					v_wind_comp(1) -= velNE_wind[1];
 					_vel_body_wind = R_to_body * v_wind_comp; // TODO: move this elsewhere
 
-					// Publish wind estimate
+					// Publish wind estimate. Disable wind estimate publish for wind estimate at mc_att_ctrl_main.cpp
 					/*wind_estimate_s wind_estimate;
 					wind_estimate.timestamp = now;
 					wind_estimate.windspeed_north = velNE_wind[0];

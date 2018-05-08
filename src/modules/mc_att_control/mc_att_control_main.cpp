@@ -1735,8 +1735,6 @@ MulticopterAttitudeControl::wind_level()
 		   && roll_pitch_angle * 180.0f / 3.14f < (_params.wind_start_num + 6.0f)) {
 		_time_start_wind++;
 
-		/*		if (_time_start_wind % 250 == 1 || !_time_warn) {
-					_time_warn = 1;*/
 		if (_time_start_wind % 250 == 1) {
 			mavlink_log_critical(&mavlink_log_pub, "Big wind, please fly with caution ");
 		}
@@ -1747,8 +1745,6 @@ MulticopterAttitudeControl::wind_level()
 		_time_start_wind++;
 
 		if (_time_start_wind % 250 == 1) {
-//		if (_time_start_wind % 250 == 1 || !_time_warn) {
-//			_time_warn = 1;
 			mavlink_log_critical(&mavlink_log_pub, "Critical wind, land advise");
 		}
 
@@ -1784,11 +1780,9 @@ MulticopterAttitudeControl::wind_detect()
 	math::Vector<3> euler_angles;
 	euler_angles = q_att.to_euler();
 
-//    PX4_INFO("user_intention_xy = %d, intention = %d, brake = %d", _user_intention_msg.user_intention_xy, _user_intention_msg.intention, _user_intention_msg.brake);
 	bool rotating = ((fabsf(_v_att.rollspeed)  > _params.max_rotation) ||
 			 (fabsf(_v_att.pitchspeed) > _params.max_rotation) ||
-			 (fabsf(_v_att.yawspeed) > _params.max_rotation));/* || ((fabsf(euler_angles(0))  > 0.1f) ||
-					 (fabsf(euler_angles(1)) > 0.1f));*/
+			 (fabsf(_v_att.yawspeed) > _params.max_rotation));
 
 	if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_MISSION
 	    || _vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF
