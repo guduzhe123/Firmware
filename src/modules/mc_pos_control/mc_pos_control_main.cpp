@@ -919,6 +919,7 @@ MulticopterPositionControl::update_ref()
 	// The reference point is only allowed to change when the vehicle is in standby state which is the
 	// normal state when the estimator origin is set. Changing reference point in flight causes large controller
 	// setpoint changes. Changing reference point in other arming states is untested and shoud not be performed.
+	//
 	if ((_local_pos.ref_timestamp != _ref_timestamp)
 	    && ((_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_STANDBY)
 		|| (!_ref_alt_is_global && _local_pos.z_global))) {
@@ -1225,6 +1226,8 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 	matrix::Vector2f stick_xy_norm = (stick_xy.length() > 0.0f) ? stick_xy.normalized() : stick_xy;
 	matrix::Vector2f stick_xy_prev_norm = (_stick_input_xy_prev.length() > 0.0f) ? _stick_input_xy_prev.normalized() :
 					      _stick_input_xy_prev;
+	// stick_xy_norm 和 stick_xy_prev_norm 只各一个运算周期, 现实中这么短时间内遥感几乎不能能有很大变化, 方向变化不可能出现，
+	// 所以这段应该有问题
 
 	/* check if stick direction and current velocity are within 60angle */
 	const bool is_aligned = (stick_xy_norm * stick_xy_prev_norm) > 0.5f;
@@ -1483,6 +1486,7 @@ MulticopterPositionControl::control_manual(float dt)
 
 	/*
 	 * Map from stick input to velocity setpoint
+	 * 遥控器输入转化为速度指令
 	 */
 
 	/* velocity setpoint commanded by user stick input */
@@ -1564,6 +1568,7 @@ MulticopterPositionControl::control_manual(float dt)
 		man_vel_sp(0) = math::expo_deadzone(_manual_x, _xy_vel_man_expo.get(), _hold_dz.get());
 		man_vel_sp(1) = math::expo_deadzone(_manual_y, _xy_vel_man_expo.get(), _hold_dz.get());
 #else
+		// 遥控器 roll, pitch 通道映射到速度目标值
 		man_vel_sp(0) = math::expo_deadzone(_manual.x, _xy_vel_man_expo.get(), _hold_dz.get());
 		man_vel_sp(1) = math::expo_deadzone(_manual.y, _xy_vel_man_expo.get(), _hold_dz.get());
 #endif
@@ -1581,6 +1586,7 @@ MulticopterPositionControl::control_manual(float dt)
 	}
 
 	/* prepare yaw to rotate into NED frame */
+	// 判断是否转动yaw, 如果不转则保持起飞时的偏航角，否则保持当前yaw
 	float yaw_input_frame = _control_mode.flag_control_fixed_hdg_enabled ? _yaw_takeoff : _att_sp.yaw_body;
 
 	/* setpoint in NED frame */
@@ -2562,6 +2568,7 @@ MulticopterPositionControl::update_velocity_derivative()
 	/* Update velocity derivative,
 	 * independent of the current flight mode
 	 */
+	// 把local_pos 的vx, vy, vz 求微分计算加速度
 	if (_local_pos.timestamp == 0) {
 		return;
 	}
@@ -2586,10 +2593,10 @@ MulticopterPositionControl::update_velocity_derivative()
 	    PX4_ISFINITE(_local_pos.vy) &&
 	    PX4_ISFINITE(_local_pos.vz)) {
 
-		_vel(0) = _local_pos.vx;
+		_vel(0) = _local_pos.vx; // 用的是本地相对速度
 		_vel(1) = _local_pos.vy;
 
-		if (_params.alt_mode == 1 && _local_pos.dist_bottom_valid) {
+		if (_params.alt_mode == 1 && _local_pos.dist_bottom_valid) { //地形跟踪,要有地形跟踪传感器
 			_vel(2) = -_local_pos.dist_bottom_rate;
 
 		} else {
@@ -2599,6 +2606,7 @@ MulticopterPositionControl::update_velocity_derivative()
 		if (!_run_alt_control) {
 			/* set velocity to the derivative of position
 			 * because it has less bias but blend it in across the landing speed range*/
+			// 权值？
 			float weighting = fminf(fabsf(_vel_sp(2)) / _params.land_speed, 1.0f);
 			_vel(2) = _z_derivative * weighting + _vel(2) * (1.0f - weighting);
 
@@ -2610,7 +2618,7 @@ MulticopterPositionControl::update_velocity_derivative()
 		_z_derivative = _local_pos.z_deriv;
 	};
 
-	_vel_err_d(0) = _vel_x_deriv.update(-_vel(0));
+	_vel_err_d(0) = _vel_x_deriv.update(-_vel(0)); // 速度微分求误差？
 
 	_vel_err_d(1) = _vel_y_deriv.update(-_vel(1));
 
@@ -2626,6 +2634,7 @@ MulticopterPositionControl::do_control(float dt)
 	_run_alt_control = true;
 
 	if (_control_mode.flag_control_manual_enabled) {
+		// position 或者 altitude mode 但是mission 和 hold mode 等模式不行
 		/* manual control */
 		control_manual(dt);
 		_mode_auto = false;
@@ -3371,11 +3380,11 @@ MulticopterPositionControl::task_main()
 			_pos_sp_triplet.current.valid = false;
 		}
 
-		was_landed = _vehicle_land_detected.landed;
+		was_landed = _vehicle_land_detected.landed; // 判断是否着陆
 
 		update_ref();
 
-		update_velocity_derivative();
+		update_velocity_derivative(); // 更新加速度误差
 
 		// reset the horizontal and vertical position hold flags for non-manual modes
 		// or if position / altitude is not controlled
@@ -3391,7 +3400,7 @@ MulticopterPositionControl::task_main()
 		    _control_mode.flag_control_position_enabled ||
 		    _control_mode.flag_control_climb_rate_enabled ||
 		    _control_mode.flag_control_velocity_enabled ||
-		    _control_mode.flag_control_acceleration_enabled) {
+		    _control_mode.flag_control_acceleration_enabled) { // 跑 position and altitude mode
 
 			do_control(dt);
 
