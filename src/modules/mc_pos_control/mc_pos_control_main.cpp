@@ -1279,7 +1279,8 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 	 */
 
 	/* we always want to break starting with slow deceleration */
-	if ((_user_intention_xy != brake) && (intention  == brake)) {
+	// _user_intention_xy 是怎么估计的？ intention是怎么估计的
+	if ((_user_intention_xy != brake) && (intention  == brake)) { //
 
 		if (_jerk_hor_max.get() > _jerk_hor_min.get()) {
 			_manual_jerk_limit_xy = (_jerk_hor_max.get() - _jerk_hor_min.get()) / _velocity_hor_manual.get() *
@@ -1299,7 +1300,7 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 		}
 
 
-		_user_intention_msg.brake = true;
+		_user_intention_msg.brake = true; // 如果在刹车，发布一次
 
 
 //		 reset slew rate
@@ -1324,8 +1325,9 @@ MulticopterPositionControl::set_manual_acceleration_xy(matrix::Vector2f &stick_x
 
 	bool rotating = (fabsf(_att.rollspeed)  > _params.max_rotation) ||
 			(fabsf(_att.pitchspeed) > _params.max_rotation) ||
-			(fabsf(_att.yawspeed) > _params.max_rotation);
+			(fabsf(_att.yawspeed) > _params.max_rotation); // 判断是否在旋转
 
+	// 一直发布真，直到刹车后飞机趋于稳定
 	if (_user_intention_msg.brake) {
 		if (rotating) {
 			_user_intention_msg.brake = true;
@@ -1630,6 +1632,7 @@ MulticopterPositionControl::control_manual(float dt)
 	} else {
 
 		/* check if we switch to alt_hold_engaged */
+		// 判断是否是高度保存状态， 如果为真则不做处理， 如果为假，则开始控制高度
 		bool smooth_alt_transition = alt_hold_desired && ((max_acc_z - _acceleration_state_dependent_z) < FLT_EPSILON) &&
 					     (_params.hold_max_z < FLT_EPSILON || fabsf(_vel(2)) < _params.hold_max_z);
 
@@ -1640,6 +1643,7 @@ MulticopterPositionControl::control_manual(float dt)
 			float delta_t = fabsf(_vel(2) / max_acc_z);
 
 			/* set desired position setpoint assuming max acceleration */
+			// 设置目标位置，消除移动的偏差
 			_pos_sp(2) = _pos(2) + _vel(2) * delta_t + 0.5f * max_acc_z * delta_t *delta_t;
 
 			_alt_hold_engaged = true;
@@ -2811,11 +2815,13 @@ MulticopterPositionControl::calculate_thrust_setpoint(float dt)
 	math::Vector<3> thrust_sp;
 
 	if (_control_mode.flag_control_acceleration_enabled && _pos_sp_triplet.current.acceleration_valid) {
+		// 目前的常用的模式： manual position altitude loiter RTL都不会涉及加速度控制
 		thrust_sp = math::Vector<3>(_pos_sp_triplet.current.a_x, _pos_sp_triplet.current.a_y, _pos_sp_triplet.current.a_z);
 
 	} else {
 		thrust_sp = vel_err.emult(_params.vel_p) + _vel_err_d.emult(_params.vel_d)
-			    + _thrust_int - math::Vector<3>(0.0f, 0.0f, _params.thr_hover);
+			    + _thrust_int - math::Vector<3>(0.0f, 0.0f,
+					    _params.thr_hover); // 油门过悬停值，一般是中位，飞机才能起飞
 	}
 
 	if (!_control_mode.flag_control_velocity_enabled && !_control_mode.flag_control_acceleration_enabled) {
@@ -3260,7 +3266,7 @@ void
 MulticopterPositionControl::task_main()
 {
 	/*
-	 * do subscriptions
+	 * do subscriptions 订阅各个topic的数据
 	 */
 	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
@@ -3294,7 +3300,7 @@ MulticopterPositionControl::task_main()
 	fds[0].fd = _local_pos_sub;
 	fds[0].events = POLLIN;
 
-	while (!_task_should_exit) {
+	while (!_task_should_exit) { //循环
 		/* wait for up to 20ms for data */
 		int pret = px4_poll(&fds[0], (sizeof(fds) / sizeof(fds[0])), 20);
 
