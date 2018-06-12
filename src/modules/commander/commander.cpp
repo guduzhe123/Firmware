@@ -125,6 +125,7 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/cc_stm32_report.h>
 #include <uORB/topics/mixer_switch.h>
+#include <uORB/topics/debug_vect.h>
 
 #include "../systemcmds/mixer/mixer.h"
 #include <lib/mixer/mixer.h>
@@ -295,6 +296,10 @@ bool _smt32_onboard_pre = false;
 int _Companion_STM32_Bat_Pre = 0;
 
 struct mixer_switch_s  _mixer_switch_report = {};
+
+static struct debug_vect_s _debug_vect = {};
+
+static orb_advert_t debug_pub = nullptr;
 /**
  * The daemon app only briefly exists to start
  * the background job. The stack size assigned in the
@@ -2209,7 +2214,7 @@ int commander_thread_main(int argc, char *argv[])
 		if (updated) {
 			power_button_state_s button_state;
 			orb_copy(ORB_ID(power_button_state), power_button_state_sub, &button_state);
-			if (button_state.event == power_button_state_s::PWR_BUTTON_STATE_REQUEST_SHUTDOWN) {
+			if (button_state.event == power_button_state_s::PWR_BUTTON_STATE_REQUEST_SHUTDOWN && is_safe(&safety, &armed)) {
 				px4_shutdown_request(false, false);
 			}
 		}
@@ -2373,8 +2378,16 @@ int commander_thread_main(int argc, char *argv[])
 				/* copy avionics voltage */
 				avionics_power_rail_voltage = system_power.voltage5V_v;
 
+				_debug_vect.x = system_power.voltage5V_v;
+
+				if (debug_pub == nullptr) {
+					debug_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect);
+				} else {
+					orb_publish(ORB_ID(debug_vect), debug_pub, &_debug_vect);
+				}
+
 				/* if the USB hardware connection went away, reboot */
-				if (status_flags.usb_connected && !system_power.usb_connected) {
+				if (status_flags.usb_connected && !system_power.usb_connected && is_safe(&safety, &armed)) {
 					/*
 					 * apparently the USB cable went away but we are still powered,
 					 * so lets reset to a classic non-usb state.
