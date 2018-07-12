@@ -172,6 +172,7 @@ private:
 	void handle_message_debug_vect(mavlink_message_t *msg);
 	void handle_message_pid_auto_tune(mavlink_message_t *msg);
 	void handle_message_battery_status_2(mavlink_message_t *msg);
+	void handle_message_gps_global_position(mavlink_message_t *msg);
 
 	void *receive_thread(void *arg);
 

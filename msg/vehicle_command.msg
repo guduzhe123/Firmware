@@ -61,6 +61,7 @@ uint16 VEHICLE_CMD_COMPONENT_ARM_DISARM = 400		# Arms / Disarms a component |1 t
 uint16 VEHICLE_CMD_START_RX_PAIR = 500			# Starts receiver pairing |0:Spektrum| 0:Spektrum DSM2, 1:Spektrum DSMX|
 uint16 VEHICLE_CMD_SET_CAMERA_MODE = 530            # Set camera capture mode (photo, video, etc.)
 uint16 VEHICLE_CMD_CT_MOTOR_STOP = 701       # CT CMD: we use 7XX for CT commands. Command to trigger a motor stop |action (0= disable(not stop), 1=enable(stop))| stop number (we use 123456, >>012345)| single or a pair(0 = 1 motor, 1 = a pair)| Empty| Empty| Empty| Empty|
+uint16 VEHICLE_CMD_MAVROS_START = 702        # Start offboard mode from px4 to companion computer though mavros
 uint16 VEHICLE_CMD_DO_TRIGGER_CONTROL = 2003            # Enable or disable on-board camera triggering system
 uint16 VEHICLE_CMD_DO_VTOL_TRANSITION = 3000    # Command VTOL transition
 uint16 VEHICLE_CMD_ARM_AUTHORIZATION_REQUEST = 3001    # Request arm authorization

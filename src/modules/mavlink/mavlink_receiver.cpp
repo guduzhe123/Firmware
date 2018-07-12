@@ -359,6 +359,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		handle_message_battery_status_2(msg);
 		break;
 
+	case MAVLINK_MSG_ID_GPS_RAW_INT:
+		handle_message_gps_global_position(msg);
+		break;
+
 	default:
 		break;
 	}
@@ -1488,6 +1492,47 @@ MavlinkReceiver::handle_message_battery_status_2(mavlink_message_t *msg)
 //   battery_status = {};
 	int instance;
 	orb_publish_auto(ORB_ID(battery_status_2), &_battery_status_2_pub, &battery_status, &instance, ORB_PRIO_HIGH);
+}
+
+
+void
+MavlinkReceiver::handle_message_gps_global_position(mavlink_message_t *msg)
+{
+	mavlink_gps_raw_int_t gps_global_pos;
+	mavlink_msg_gps_raw_int_decode(msg, &gps_global_pos);
+	PX4_INFO("altitude = %.6f", (double) gps_global_pos.alt * 1e-6);
+	struct vehicle_gps_position_s gps_position = {};
+
+	gps_position.timestamp_time_relative = 0;
+	gps_position.time_utc_usec = gps_global_pos.time_usec;
+
+
+	gps_position.timestamp = hrt_absolute_time();;
+	gps_position.eph = (float) gps_global_pos.eph * 1e-2f; // from cm to m
+	gps_position.epv = (float) gps_global_pos.epv * 1e-2f; // from cm to m
+
+	gps_position.s_variance_m_s = 1.0f;
+
+	gps_position.vel_m_s = (float) gps_global_pos.vel * 1e-2f; // from cm/s to m/s
+	gps_position.vel_ned_valid = true;
+	gps_position.cog_rad = _wrap_pi(gps_global_pos.cog * M_DEG_TO_RAD_F * 1e-2f);
+
+	gps_position.fix_type = gps_global_pos.fix_type;
+	gps_position.satellites_used =
+		gps_global_pos.satellites_visible;  //TODO: rename mavlink_hil_gps_t sats visible to used?
+
+	gps_position.lat = gps_global_pos.lat * 1e-6;
+	gps_position.lat = gps_global_pos.lat * 1e-6;
+	gps_position.lat = gps_global_pos.lat * 1e-6;
+
+//	vehicle_gps_position_s
+	if (_gps_pub == nullptr) {
+		_gps_pub = orb_advertise(ORB_ID(vehicle_gps_position), &gps_position);
+
+	} else {
+		orb_publish(ORB_ID(vehicle_gps_position), _gps_pub, &gps_position);
+	}
+
 }
 
 void

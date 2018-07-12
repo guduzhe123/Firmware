@@ -1300,6 +1300,19 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 	}
 		break;
 
+	case vehicle_command_s::VEHICLE_CMD_MAVROS_START: {
+		_debug_vect.x = (float)cmd->param1 ;//
+        PX4_INFO("param1 =  %d", (int)cmd->param1);
+
+		if (debug_pub == nullptr) {
+			debug_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect);
+		} else {
+			orb_publish(ORB_ID(debug_vect), debug_pub, &_debug_vect);
+		}
+
+		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+	}
+			break;
 	case vehicle_command_s::VEHICLE_CMD_MISSION_START: {
 
 		cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_DENIED;
@@ -2378,13 +2391,13 @@ int commander_thread_main(int argc, char *argv[])
 				/* copy avionics voltage */
 				avionics_power_rail_voltage = system_power.voltage5V_v;
 
-				_debug_vect.x = system_power.voltage5V_v;
-
-				if (debug_pub == nullptr) {
-					debug_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect);
-				} else {
-					orb_publish(ORB_ID(debug_vect), debug_pub, &_debug_vect);
-				}
+//				_debug_vect.x = system_power.voltage5V_v;
+//
+//				if (debug_pub == nullptr) {
+//					debug_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect);
+//				} else {
+//					orb_publish(ORB_ID(debug_vect), debug_pub, &_debug_vect);
+//				}
 
 				/* if the USB hardware connection went away, reboot */
 				if (status_flags.usb_connected && !system_power.usb_connected && is_safe(&safety, &armed)) {

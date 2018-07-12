@@ -1601,12 +1601,12 @@ MulticopterPositionControl::control_manual(float dt)
 	float max_acc_z;
 	set_manual_acceleration_z(max_acc_z, stick_z, dt);
 
-	if (_debug_vect_pub == nullptr) {
-		_debug_vect_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect_msg);
+	/*	if (_debug_vect_pub == nullptr) {
+			_debug_vect_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect_msg);
 
-	} else {
-		orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &_debug_vect_msg);
-	}
+		} else {
+			orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &_debug_vect_msg);
+		}*/
 
 	/* prepare cruise speed (m/s) vector to scale the velocity setpoint */
 	float vel_mag = (_velocity_hor_manual.get() < _vel_max_xy) ? _velocity_hor_manual.get() : _vel_max_xy;
