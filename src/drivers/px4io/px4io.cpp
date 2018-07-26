@@ -2051,6 +2051,7 @@ PX4IO::io_publish_pwm_outputs()
 	/* convert from register format to float */
 	for (unsigned i = 0; i < _max_actuators; i++) {
 		outputs.output[i] = ctl[i];
+
 	}
 
 	int instance;
@@ -2198,6 +2199,7 @@ PX4IO::print_debug()
 int
 PX4IO::mixer_send(const char *buf, unsigned buflen, unsigned retries)
 {
+	PX4_INFO("buf = %s", buf);
 	/* get debug level */
 	int debuglevel = io_reg_get(PX4IO_PAGE_SETUP, PX4IO_P_SETUP_SET_DEBUG);
 

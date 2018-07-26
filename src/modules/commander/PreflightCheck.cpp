@@ -636,6 +636,7 @@ bool preflightCheck(orb_advert_t *mavlink_log_pub, bool checkSensors, bool check
 #endif
 
 	bool failed = false;
+    checkAirspeed = false;
 
 	/* ---- MAG ---- */
 	if (checkSensors) {

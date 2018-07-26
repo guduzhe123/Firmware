@@ -1945,6 +1945,8 @@ int commander_thread_main(int argc, char *argv[])
 		checkAirspeed = true;
 	}
 
+    checkAirspeed = false; // for ugv
+
 	commander_boot_timestamp = hrt_absolute_time();
 
 	// Run preflight check
@@ -1982,6 +1984,8 @@ int commander_thread_main(int argc, char *argv[])
 		set_tune_override(TONE_STARTUP_TUNE); //normal boot tune
 	} else {
 			// sensor diagnostics done continuously, not just at boot so don't warn about any issues just yet
+		PX4_INFO("check mavrine !!!!!");
+        PX4_INFO("checkAirspeed = %d", checkAirspeed );
 			status_flags.condition_system_sensors_initialized = Commander::preflightCheck(&mavlink_log_pub, true,
 				checkAirspeed, (status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), !status_flags.circuit_breaker_engaged_gpsfailure_check,
 				false, is_vtol(&status), false, false, hrt_elapsed_time(&commander_boot_timestamp));
@@ -2311,6 +2315,7 @@ int commander_thread_main(int argc, char *argv[])
 								 true, is_vtol(&status), false, false, hrt_elapsed_time(&commander_boot_timestamp));
 					} else {
 						/* check sensors also */
+                        checkAirspeed = false; // for ugv
 						(void)Commander::preflightCheck(&mavlink_log_pub, true, checkAirspeed,
 								(status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), arm_requirements & ARM_REQ_GPS_BIT,
 								 true, is_vtol(&status), hotplug_timeout, false, hrt_elapsed_time(&commander_boot_timestamp));
@@ -4787,6 +4792,7 @@ void *commander_low_prio_loop(void *arg)
 						    (!status.is_rotary_wing || status.is_vtol)) {
 							checkAirspeed = true;
 						}
+                        checkAirspeed = false; // for ugv
 
 						status_flags.condition_system_sensors_initialized = Commander::preflightCheck(&mavlink_log_pub, true, checkAirspeed,
 							!(status.rc_input_mode >= vehicle_status_s::RC_IN_MODE_OFF), arm_requirements & ARM_REQ_GPS_BIT,
