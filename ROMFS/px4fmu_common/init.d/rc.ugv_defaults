@@ -22,9 +22,9 @@ fi
 # and need to be set together.
 set PWM_OUT 12
 
-# PWM Hz - 50 Hz is the normal rate in RC cars, higher rates
+# PWM Hz - 100 Hz is the normal rate in RC cars, higher rates
 # may damage analog servos.
-set PWM_RATE 50
+set PWM_RATE 100
 
 # This is the gimbal pass mixer
 set MIXER_AUX pass
