@@ -175,6 +175,18 @@ GroundRoverAttitudeControl::battery_status_poll()
 }
 
 void
+GroundRoverAttitudeControl::vehicle_status_poll()
+{
+	/* check if there is a new message */
+	bool updated;
+	orb_check(_vehicle_status_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_status), _vehicle_status_sub, &_vehicle_status);
+	}
+}
+
+void
 GroundRoverAttitudeControl::task_main_trampoline(int argc, char *argv[])
 {
 	att_gnd_control::g_control->task_main();
@@ -189,6 +201,7 @@ GroundRoverAttitudeControl::task_main()
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_manual_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
 	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
+	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 
 	parameters_update();
 
@@ -197,6 +210,7 @@ GroundRoverAttitudeControl::task_main()
 	vehicle_control_mode_poll();
 	manual_control_setpoint_poll();
 	battery_status_poll();
+	vehicle_status_poll();
 
 	/* wakeup source */
 	px4_pollfd_struct_t fds[2];
@@ -258,6 +272,7 @@ GroundRoverAttitudeControl::task_main()
 			vehicle_control_mode_poll();
 			manual_control_setpoint_poll();
 			battery_status_poll();
+			vehicle_status_poll();
 
 			/* decide if in stabilized or full manual control */
 			if (_vcontrol_mode.flag_control_rates_enabled) {
@@ -266,8 +281,20 @@ GroundRoverAttitudeControl::task_main()
 
 					Eulerf euler_angles(matrix::Quatf(_att.q));
 
+					if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_ALTCTL) {
+						if (_vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED) {
+							_arm_count++;
+
+							if (_arm_count < 4) {
+								_att_sp.yaw_body = euler_angles.psi();
+								PX4_INFO("_att_sp.yaw_body = %.4f", (double)_att_sp.yaw_body);
+							}
+						}
+					}
+
 					/* Calculate the control output for the steering as yaw */
 					float yaw_u = pid_calculate(&_steering_ctrl, _att_sp.yaw_body, euler_angles.psi(), _att.yawspeed, deltaT);
+//					PX4_INFO("_att_sp.yaw_body = %.4f, euler_angles.psi() = %.4f", (double)_att_sp.yaw_body, (double)euler_angles.psi());
 
 					float angle_diff = 0.0f;
 
@@ -309,6 +336,18 @@ GroundRoverAttitudeControl::task_main()
 					    _actuators.control[actuator_controls_s::INDEX_THROTTLE] > 0.1f) {
 
 						_actuators.control[actuator_controls_s::INDEX_THROTTLE] *= _battery_status.scale;
+					}
+
+					if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_ALTCTL) {
+
+						if (_manual.r < -0.0001f || _manual.r > 0.0001f) {
+							_actuators.control[actuator_controls_s::INDEX_YAW] =
+								_manual.r * _parameters.man_yaw_scale + _parameters.trim_yaw;
+						}
+
+						if (_manual.z > 0.0001f || _manual.z < -0.0001f) {
+							_actuators.control[actuator_controls_s::INDEX_THROTTLE] = _manual.z;
+						}
 					}
 				}
 
