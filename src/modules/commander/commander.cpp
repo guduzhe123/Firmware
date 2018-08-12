@@ -1984,8 +1984,8 @@ int commander_thread_main(int argc, char *argv[])
 		set_tune_override(TONE_STARTUP_TUNE); //normal boot tune
 	} else {
 			// sensor diagnostics done continuously, not just at boot so don't warn about any issues just yet
-		PX4_INFO("check mavrine !!!!!");
-        PX4_INFO("checkAirspeed = %d", checkAirspeed );
+/*		PX4_INFO("check mavrine !!!!!");
+        PX4_INFO("checkAirspeed = %d", checkAirspeed );*/
 			status_flags.condition_system_sensors_initialized = Commander::preflightCheck(&mavlink_log_pub, true,
 				checkAirspeed, (status.rc_input_mode == vehicle_status_s::RC_IN_MODE_DEFAULT), !status_flags.circuit_breaker_engaged_gpsfailure_check,
 				false, is_vtol(&status), false, false, hrt_elapsed_time(&commander_boot_timestamp));

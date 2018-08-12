@@ -363,6 +363,10 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		handle_message_gps_global_position(msg);
 		break;
 
+	case MAVLINK_MSG_ID_HIL_GPS:
+		handle_message_hil_gps(msg);
+		break;
+
 	default:
 		break;
 	}
@@ -2196,6 +2200,8 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 	hil_gps.alt = gps.alt;
 	hil_gps.eph = (float)gps.eph * 1e-2f; // from cm to m
 	hil_gps.epv = (float)gps.epv * 1e-2f; // from cm to m
+	hil_gps.hdop = (float)gps.eph * 1e-2f; // from cm to m
+	hil_gps.vdop = (float)gps.epv * 1e-2f; // from cm to m
 
 	hil_gps.s_variance_m_s = 1.0f;
 
@@ -2206,8 +2212,11 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 	hil_gps.vel_ned_valid = true;
 	hil_gps.cog_rad = _wrap_pi(gps.cog * M_DEG_TO_RAD_F * 1e-2f);
 
-	hil_gps.fix_type = gps.fix_type;
+	hil_gps.fix_type = gps.fix_type ;
+//	hil_gps.fix_type = 5;
 	hil_gps.satellites_used = gps.satellites_visible;  //TODO: rename mavlink_hil_gps_t sats visible to used?
+//	        PX4_INFO("hil_gps.satellites_used = %d", hil_gps.satellites_used);
+	PX4_INFO("hil_gps.lat = %.8f, hil_gps.lat = %.8f", (double)hil_gps.lat, (double)hil_gps.lat);
 
 	if (_gps_pub == nullptr) {
 		_gps_pub = orb_advertise(ORB_ID(vehicle_gps_position), &hil_gps);
