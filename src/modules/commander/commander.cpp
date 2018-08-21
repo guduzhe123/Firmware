@@ -300,6 +300,8 @@ struct mixer_switch_s  _mixer_switch_report = {};
 static struct debug_vect_s _debug_vect = {};
 
 static orb_advert_t debug_pub = nullptr;
+
+static orb_advert_t _to_safety = nullptr;
 /**
  * The daemon app only briefly exists to start
  * the background job. The stack size assigned in the
@@ -1048,6 +1050,32 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 			}
 		}
 		break;
+
+        case vehicle_command_s::VEHICLE_CMD_PRESS_SAFETY_ON: {
+//            struct safety_s safety;
+            safety.timestamp = hrt_absolute_time();
+            safety.safety_switch_available = true;
+
+			if ( (int)cmd->param1 == 1) {
+				safety.safety_off =  true ;
+			} else if ( (int)cmd->param1 == 0) {
+				safety.safety_off =  false ;
+			}
+
+            safety.override_available = true;
+            safety.override_enabled = false;
+            PX4_INFO("safety.safety_off = %d", safety.safety_off);
+
+            /* lazily publish the safety status */
+            if (_to_safety != nullptr) {
+                orb_publish(ORB_ID(safety), _to_safety, &safety);
+
+            } else {
+                _to_safety = orb_advertise(ORB_ID(safety), &safety);
+            }
+            cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+        }
+            break;
 
 		// for GCS
 		case vehicle_command_s::VEHICLE_CMD_CCC_TAKEOVER: {
@@ -2249,7 +2277,7 @@ int commander_thread_main(int argc, char *argv[])
 		}
 
 		if (offboard_control_mode.timestamp != 0 &&
-		    offboard_control_mode.timestamp + OFFBOARD_TIMEOUT > hrt_absolute_time()) {
+		    offboard_control_mode.timestamp + OFFBOARD_TIMEOUT > hrt_absolute_time()) {  // check if offboard signal lost or timeout
 			if (status_flags.offboard_control_signal_lost) {
 				status_flags.offboard_control_signal_lost = false;
 				status_flags.offboard_control_loss_timeout = false;
