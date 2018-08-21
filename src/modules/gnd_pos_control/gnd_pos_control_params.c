@@ -260,3 +260,24 @@ PARAM_DEFINE_FLOAT(GND_SPEED_TRIM, 3.0f);
  * @group FW TECS
  */
 PARAM_DEFINE_FLOAT(GND_SPEED_MAX, 10.0f);
+
+/**
+ * thrust in auto mode
+ *
+ *
+ * @min 0.0
+ * @max 1.0
+ * @group GND TECS
+ */
+PARAM_DEFINE_FLOAT(GND_THRUST_AUTO, 0.20f);
+
+/**
+ * accept radium to stop thrust
+ *
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 100
+ * @group GND TECS
+ */
+PARAM_DEFINE_FLOAT(GND_ACCPT_RAD, 2.0f);

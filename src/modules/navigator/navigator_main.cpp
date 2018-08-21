@@ -371,6 +371,7 @@ Navigator::task_main()
 		if (updated) {
 			vehicle_command_s cmd;
 			orb_copy(ORB_ID(vehicle_command), _vehicle_command_sub, &cmd);
+			PX4_INFO("cmd.command = %d", cmd.command);
 
 			if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_GO_AROUND) {
 
@@ -394,6 +395,9 @@ Navigator::task_main()
 				rep->current.type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 				rep->current.cruising_speed = get_cruising_speed();
 				rep->current.cruising_throttle = get_cruising_throttle();
+
+				PX4_INFO("cmd.param4 = %.2f, cmd.param5 = %.8f,cmd.param6 = %.8f,cmd.param7 = %.2f",
+					 (double)cmd.param4, (double)cmd.param5, (double)cmd.param6, (double)cmd.param7);
 
 				// Go on and check which changes had been requested
 				if (PX4_ISFINITE(cmd.param4)) {
@@ -780,6 +784,8 @@ Navigator::publish_position_setpoint_triplet()
 	if (!_pos_sp_triplet.current.valid) {
 		return;
 	}
+
+	PX4_INFO("publish pos update");
 
 	/* lazily publish the position setpoint triplet only once available */
 	if (_pos_sp_triplet_pub != nullptr) {

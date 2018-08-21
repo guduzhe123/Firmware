@@ -159,6 +159,10 @@ Loiter::reposition()
 		pos_sp_triplet->previous.alt = _navigator->get_global_position()->alt;
 		memcpy(&pos_sp_triplet->current, &rep->current, sizeof(rep->current));
 		pos_sp_triplet->next.valid = false;
+		PX4_INFO("lat = %.8f, lon = %.8f, alt = %.2f, yaw = %.2f", (double)_navigator->get_global_position()->lat,
+			 (double)_navigator->get_global_position()->lon, (double)_navigator->get_global_position()->alt,
+			 (double)_navigator->get_global_position()->yaw);
+
 
 		// set yaw (depends on the value of parameter MIS_YAWMODE):
 		// MISSION_YAWMODE_NONE: do not change yaw setpoint
@@ -167,6 +171,7 @@ Loiter::reposition()
 			float travel_dist = get_distance_to_next_waypoint(_navigator->get_global_position()->lat,
 					    _navigator->get_global_position()->lon,
 					    pos_sp_triplet->current.lat, pos_sp_triplet->current.lon);
+			PX4_INFO("travel_dist = %.2f", (double)travel_dist);
 
 			if (travel_dist > 1.0f) {
 				// calculate direction the vehicle should point to.
@@ -175,6 +180,7 @@ Loiter::reposition()
 								      _navigator->get_global_position()->lon,
 								      pos_sp_triplet->current.lat,
 								      pos_sp_triplet->current.lon);
+				PX4_INFO("pos->yaw = %.2f", (double)(pos_sp_triplet->current.yaw * 180.0f / 3.14f));
 			}
 		}
 
