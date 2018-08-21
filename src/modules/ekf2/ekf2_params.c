@@ -1232,3 +1232,13 @@ PARAM_DEFINE_FLOAT(EKF2_ABL_GYRLIM, 3.0f);
  * @decimal 2
  */
 PARAM_DEFINE_FLOAT(EKF2_ABL_TAU, 0.5f);
+
+/**
+ * Using RTK yaw if RTK is fixed.
+ *
+ *
+ * @group EKF2
+ * @value 0 Range aid disabled
+ * @value 1 Range aid enabled
+ */
+PARAM_DEFINE_INT32(EKF2_RTK_YAW, 0);
