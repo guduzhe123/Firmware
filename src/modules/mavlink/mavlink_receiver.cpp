@@ -2213,10 +2213,10 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 	hil_gps.cog_rad = _wrap_pi(gps.cog * M_DEG_TO_RAD_F * 1e-2f);
 
 	hil_gps.fix_type = gps.fix_type ;
-//	hil_gps.fix_type = 5;
+	hil_gps.fix_type = 6;
 	hil_gps.satellites_used = gps.satellites_visible;  //TODO: rename mavlink_hil_gps_t sats visible to used?
 //	        PX4_INFO("hil_gps.satellites_used = %d", hil_gps.satellites_used);
-	PX4_INFO("hil_gps.lat = %.8f, hil_gps.lat = %.8f", (double)hil_gps.lat, (double)hil_gps.lat);
+//	PX4_INFO("hil_gps.lat = %.8f, hil_gps.lon = %.8f, hil_gps.alt = %.2f", (double)hil_gps.lat, (double)hil_gps.lon, (double)hil_gps.alt);
 
 	if (_gps_pub == nullptr) {
 		_gps_pub = orb_advertise(ORB_ID(vehicle_gps_position), &hil_gps);

@@ -1013,6 +1013,9 @@ private:
 	MavlinkOrbSubscription *_sensor_sub;
 	uint64_t _sensor_time;
 
+	MavlinkOrbSubscription *_gps_sub;
+	uint64_t _gps_time;
+
 	/* do not allow top copying this class */
 	MavlinkStreamVFRHUD(MavlinkStreamVFRHUD &);
 	MavlinkStreamVFRHUD &operator = (const MavlinkStreamVFRHUD &);
@@ -1032,7 +1035,9 @@ protected:
 		_airspeed_sub(_mavlink->add_orb_subscription(ORB_ID(airspeed))),
 		_airspeed_time(0),
 		_sensor_sub(_mavlink->add_orb_subscription(ORB_ID(sensor_combined))),
-		_sensor_time(0)
+		_sensor_time(0),
+		_gps_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_gps_position))),
+		_gps_time(0)
 	{}
 
 	bool send(const hrt_abstime t)
@@ -1043,6 +1048,7 @@ protected:
 		struct airspeed_s airspeed = {};
 		struct actuator_controls_s act0 = {};
 		struct actuator_controls_s act1 = {};
+		struct vehicle_gps_position_s gps_pos = {};
 
 		bool updated = _att_sub->update(&_att_time, &att);
 		updated |= _pos_sub->update(&_pos_time, &pos);
@@ -1050,13 +1056,15 @@ protected:
 		updated |= _airspeed_sub->update(&_airspeed_time, &airspeed);
 		updated |= _act0_sub->update(&_act0_time, &act0);
 		updated |= _act1_sub->update(&_act1_time, &act1);
+		updated |= _gps_sub->update(&_gps_time, &gps_pos);
 
 		if (updated) {
 			mavlink_vfr_hud_t msg = {};
-			matrix::Eulerf euler = matrix::Quatf(att.q);
+//			matrix::Eulerf euler = matrix::Quatf(att.q);
 			msg.airspeed = airspeed.indicated_airspeed_m_s;
 			msg.groundspeed = sqrtf(pos.vel_n * pos.vel_n + pos.vel_e * pos.vel_e);
-			msg.heading = _wrap_2pi(euler.psi()) * M_RAD_TO_DEG_F;
+//			msg.heading = _wrap_2pi(euler.psi()) * M_RAD_TO_DEG_F;
+			msg.heading = _wrap_360(gps_pos.cog_rad * M_RAD_TO_DEG_F);
 
 			if (armed.armed) {
 				// VFR_HUD throttle should only be used for operator feedback.

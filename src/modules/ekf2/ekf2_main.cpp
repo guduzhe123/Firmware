@@ -902,11 +902,23 @@ void Ekf2::run()
 				q.copyTo(att.q);
 				_ekf.get_quat_reset(&att.delta_q_reset[0], &att.quat_reset_counter);
 
+				// insert RTK angle
+				math::Quaternion q_att(att.q[0], att.q[1], att.q[2], att.q[3]);
+				math::Matrix<3, 3> _R;
+				_R = q_att.to_dcm();
+				math::Vector<3> euler_angles;
+				euler_angles = _R.to_euler();
+
+				euler_angles(2) = gps.cog_rad;
+				matrix::Quatf att_gps = matrix::Eulerf(euler_angles(0), euler_angles(1), euler_angles(2));
+				att_gps.copyTo(att.q);
+
+
 				att.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
 				att.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
 				att.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
 
-				// publish vehicle attitude data
+				// publish vehicle attitude data    change here
 				if (_att_pub == nullptr) {
 					_att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
 
