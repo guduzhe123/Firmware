@@ -281,3 +281,36 @@ PARAM_DEFINE_FLOAT(GND_THRUST_AUTO, 0.20f);
  * @group GND TECS
  */
 PARAM_DEFINE_FLOAT(GND_ACCPT_RAD, 2.0f);
+
+/**
+ * thrust control kp
+ *
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 100
+ * @group GND TECS
+ */
+PARAM_DEFINE_FLOAT(GND_THRUST_KP, 0.01f);
+
+/**
+ * accept radium to stop thrust
+ *
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 100
+ * @group GND TECS
+ */
+PARAM_DEFINE_FLOAT(GND_THRUST_KI, 0.01f);
+
+/**
+ * accept radium to stop thrust
+ *
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 100
+ * @group GND TECS
+ */
+PARAM_DEFINE_FLOAT(GND_THRUST_KD, 0.01f);

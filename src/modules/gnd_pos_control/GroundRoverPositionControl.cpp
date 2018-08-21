@@ -90,6 +90,12 @@ GroundRoverPositionControl::GroundRoverPositionControl() :
 	_parameter_handles.thrust_auto = param_find("GND_THRUST_AUTO");
 	_parameter_handles.acc_rad = param_find("GND_ACCPT_RAD");
 
+	_parameter_handles.thrust_kp = param_find("GND_THRUST_KP");
+	_parameter_handles.thrust_ki = param_find("GND_THRUST_KI");
+	_parameter_handles.thrust_kd = param_find("GND_THRUST_KD");
+
+
+
 	/* fetch initial parameter values */
 	parameters_update();
 }
@@ -143,6 +149,12 @@ GroundRoverPositionControl::parameters_update()
 
 	param_get(_parameter_handles.acc_rad, &(_parameters.acc_rad));
 	param_get(_parameter_handles.thrust_auto, &(_parameters.thrust_auto));
+
+	param_get(_parameter_handles.thrust_kp, &(_parameters.thrust_kp));
+	param_get(_parameter_handles.thrust_ki, &(_parameters.thrust_ki));
+	param_get(_parameter_handles.thrust_kd, &(_parameters.thrust_kd));
+
+
 
 	_gnd_control.set_l1_damping(_parameters.l1_damping);
 	_gnd_control.set_l1_period(_parameters.l1_period);
@@ -315,8 +327,13 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 			if (!_achieved) {
 				// pid calculate thrust.
-				_att_sp.thrust = 0.01f * _gnd_pos_ctrl_status.wp_dist ;
+				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
+						 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
+						 + _parameters.thrust_ki * (_gnd_pos_dist_i + _gnd_pos_ctrl_status.wp_dist * dt);
+//                _att_sp.thrust = pid_calculate(&_thrust_ctrl, );
 				_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);
+
+				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 			}
 
 			if (pos_sp_triplet.current.valid) {

@@ -106,6 +106,8 @@ private:
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
 	float   _nav_bearing{};
+	float  _gnd_pos_dist_pre{};
+	float  _gnd_pos_dist_i{};
 
 	fw_pos_ctrl_status_s			_gnd_pos_ctrl_status{};		/**< navigation capabilities */
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
@@ -158,6 +160,10 @@ private:
 		float thrust_auto;
 		float acc_rad;
 
+		float thrust_kp;
+		float thrust_ki;
+		float thrust_kd;
+
 	} _parameters{};			/**< local copies of interesting parameters */
 
 	struct {
@@ -183,6 +189,10 @@ private:
 
 		param_t thrust_auto;
 		param_t acc_rad;
+
+		param_t thrust_kp;
+		param_t thrust_ki;
+		param_t thrust_kd;
 
 	} _parameter_handles{};		/**< handles for interesting parameters */
 
