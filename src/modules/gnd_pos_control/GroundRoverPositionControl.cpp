@@ -353,7 +353,8 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_achieved = false;
 			}
 
-//			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f", (double)_att_sp.thrust, (double)_att_sp.yaw_body);
+			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f,_gnd_pos_ctrl_status.wp_dist = %.4f",
+				 (double)_att_sp.thrust, (double)_att_sp.yaw_body, (double)_gnd_pos_ctrl_status.wp_dist);
 		}
 
 		if (was_circle_mode && !_gnd_control.circle_mode()) {
