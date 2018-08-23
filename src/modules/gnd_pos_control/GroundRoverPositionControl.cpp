@@ -310,22 +310,25 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			_att_sp.roll_body = _gnd_control.nav_roll();
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = _gnd_control.nav_bearing();
+
 			_att_sp.fw_control_yaw = true;
 			_att_sp.thrust = mission_throttle;
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-			PX4_INFO("_gnd_control.nav_bearing() = %.2f, pos_sp_triplet.current.yaw = %.2f, _nav_bearing = %.2f",
-				 (double)_gnd_control.nav_bearing(), (double)pos_sp_triplet.current.yaw, (double)_nav_bearing);
+//			PX4_INFO("_gnd_control.nav_bearing() = %.2f, pos_sp_triplet.current.yaw = %.2f, _nav_bearing = %.2f",
+//				 (double)_gnd_control.nav_bearing(), (double)pos_sp_triplet.current.yaw, (double)_nav_bearing);
 			/* waypoint is a loiter waypoint so we want to stop*/
 			_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
 						     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
 
+			Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
 			_att_sp.roll_body = _gnd_control.nav_roll();
 			_att_sp.pitch_body = 0.0f;
-			_att_sp.yaw_body = _gnd_control.nav_bearing();
+			_att_sp.yaw_body = euler_angles.psi(); // needs actual att now. so actuators don't move when change hold mode
+			// only if target point is setted
 			_att_sp.fw_control_yaw = true;
 
-			if (!_achieved) {
+			if (!_achieved && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
 				// pid calculate thrust.
 				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
 						 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
@@ -336,11 +339,11 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 			}
 
-			if (pos_sp_triplet.current.valid) {
+			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
 				_att_sp.yaw_body = _nav_bearing;
 			}
 
-			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
+//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
 
 			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
 				_att_sp.thrust = 0.0f;
@@ -350,7 +353,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_achieved = false;
 			}
 
-			PX4_INFO("_att_sp.thrust = %.2f", (double)_att_sp.thrust);
+//			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f", (double)_att_sp.thrust, (double)_att_sp.yaw_body);
 		}
 
 		if (was_circle_mode && !_gnd_control.circle_mode()) {

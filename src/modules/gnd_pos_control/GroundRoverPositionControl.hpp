@@ -115,6 +115,7 @@ private:
 	vehicle_attitude_setpoint_s		_att_sp{};			/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_control_mode{};			/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
+	vehicle_attitude_s				_att {};	/**< control state */
 
 	Subscription<vehicle_attitude_s>	_sub_attitude;
 	Subscription<sensor_bias_s>	_sub_sensors;
