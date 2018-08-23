@@ -296,6 +296,7 @@ GroundRoverAttitudeControl::task_main()
 					float yaw_u = pid_calculate(&_steering_ctrl, _att_sp.yaw_body, euler_angles.psi(), _att.yawspeed, deltaT);
 //					PX4_INFO("_att_sp.yaw_body = %.4f, euler_angles.psi() = %.4f", (double)_att_sp.yaw_body, (double)euler_angles.psi());
 
+
 					float angle_diff = 0.0f;
 
 					if (_att_sp.yaw_body * euler_angles.psi() < 0.0f) {
@@ -314,6 +315,7 @@ GroundRoverAttitudeControl::task_main()
 					}
 
 					math::constrain(yaw_u, -1.0f, 1.0f);
+//					PX4_INFO("yaw_u = %.2f", (double)yaw_u);
 
 					if (PX4_ISFINITE(yaw_u)) {
 						_actuators.control[actuator_controls_s::INDEX_YAW] = yaw_u + _parameters.trim_yaw;
@@ -331,6 +333,7 @@ GroundRoverAttitudeControl::task_main()
 					/* throttle passed through if it is finite and if no engine failure was detected */
 					_actuators.control[actuator_controls_s::INDEX_THROTTLE] = _att_sp.thrust;
 
+//                    PX4_INFO("yaw_u = %.2f, _att_sp.thrust = %.2f", (double)yaw_u, (double)_att_sp.thrust);
 					/* scale effort by battery status */
 					if (_parameters.bat_scale_en && _battery_status.scale > 0.0f &&
 					    _actuators.control[actuator_controls_s::INDEX_THROTTLE] > 0.1f) {
