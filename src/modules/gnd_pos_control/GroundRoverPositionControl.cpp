@@ -330,11 +330,13 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 			if (!_achieved && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
 				// pid calculate thrust.
-				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
-						 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
-						 + _parameters.thrust_ki * (_gnd_pos_dist_i + _gnd_pos_ctrl_status.wp_dist * dt);
-//                _att_sp.thrust = pid_calculate(&_thrust_ctrl, );
-				_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);
+				/*				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
+										 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
+										 + _parameters.thrust_ki * (_gnd_pos_dist_i + _gnd_pos_ctrl_status.wp_dist * dt);
+				//                _att_sp.thrust = pid_calculate(&_thrust_ctrl, );
+				//                _att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist;
+								_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);*/
+				_att_sp.thrust = mission_throttle;
 
 				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 			}
