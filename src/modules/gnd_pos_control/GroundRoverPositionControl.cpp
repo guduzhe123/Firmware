@@ -330,12 +330,11 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 			if (!_achieved && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
 				// pid calculate thrust.
-				/*				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
-										 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
-										 + _parameters.thrust_ki * (_gnd_pos_dist_i + _gnd_pos_ctrl_status.wp_dist * dt);
-				//                _att_sp.thrust = pid_calculate(&_thrust_ctrl, );
-				//                _att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist;
-								_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);*/
+//				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
+//						 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
+//						 + _parameters.thrust_ki * (_gnd_pos_dist_i + _gnd_pos_ctrl_status.wp_dist * dt);
+////                _att_sp.thrust = pid_calculate(&_thrust_ctrl, );
+//				_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);
 				_att_sp.thrust = mission_throttle;
 
 				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
@@ -345,7 +344,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_att_sp.yaw_body = _nav_bearing;
 			}
 
-//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
+			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
 
 			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
 				_att_sp.thrust = 0.0f;
@@ -355,8 +354,11 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_achieved = false;
 			}
 
-			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f,_gnd_pos_ctrl_status.wp_dist = %.4f",
-				 (double)_att_sp.thrust, (double)_att_sp.yaw_body, (double)_gnd_pos_ctrl_status.wp_dist);
+			if (_achieved) {
+				_att_sp.thrust = 0.0f;
+			}
+
+//			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f", (double)_att_sp.thrust, (double)_att_sp.yaw_body);
 		}
 
 		if (was_circle_mode && !_gnd_control.circle_mode()) {
