@@ -8,7 +8,7 @@ set(config_module_list
 	# Board support modules
 	#
 	#drivers/adis16448
-	drivers/airspeed
+	#drivers/airspeed
 	#drivers/blinkm
 	#drivers/bmi160
 	#drivers/bmp280
@@ -26,11 +26,11 @@ set(config_module_list
 	#drivers/iridiumsbd
 	#drivers/irlock
 	#drivers/ist8310
-	drivers/l3gd20
+	drivers/l3gd20 # gyro
 	drivers/led
-	drivers/lis3mdl
+	drivers/lis3mdl # mag
 	drivers/ll40ls
-	drivers/lsm303d
+	drivers/lsm303d # mag and acc
 	#drivers/mb12xx
 	#drivers/mkblctrl
 	drivers/mpu6000

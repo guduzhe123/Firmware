@@ -800,6 +800,7 @@ protected:
 			msg.pressure_alt = sensor.baro_alt_meter;
 			msg.temperature = sensor.baro_temp_celcius;
 			msg.fields_updated = fields_updated;
+//			PX4_INFO("sensor.accelerometer_m_s2[2] = %.4f, bias.accel_z_bias = %.4f", (double)sensor.accelerometer_m_s2[2], (double)bias.accel_z_bias);
 
 			mavlink_msg_highres_imu_send_struct(_mavlink->get_channel(), &msg);
 

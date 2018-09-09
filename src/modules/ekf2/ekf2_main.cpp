@@ -1095,6 +1095,16 @@ void Ekf2::run()
 				bias.mag_y_bias = _last_valid_mag_cal[1];
 				bias.mag_z_bias = _last_valid_mag_cal[2];
 
+				if (0) {
+					bias.accel_x_bias = 0;
+					bias.accel_y_bias = 0;
+					bias.accel_z_bias = 0;
+
+					bias.gyro_x_bias = 0;
+					bias.gyro_y_bias = 0;
+					bias.gyro_z_bias = 0;
+				}
+
 				if (_sensor_bias_pub == nullptr) {
 					_sensor_bias_pub = orb_advertise(ORB_ID(sensor_bias), &bias);
 

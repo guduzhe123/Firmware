@@ -367,6 +367,11 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		handle_message_hil_gps(msg);
 		break;
 
+
+	case MAVLINK_MSG_ID_HIL_SENSOR:
+		handle_message_hil_sensor(msg);
+		break;
+
 	default:
 		break;
 	}
@@ -2071,22 +2076,25 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 
 	/* gyro */
 	{
-		struct gyro_report gyro = {};
+		if (0) {
 
-		gyro.timestamp = timestamp;
-		gyro.x_raw = imu.xgyro * 1000.0f;
-		gyro.y_raw = imu.ygyro * 1000.0f;
-		gyro.z_raw = imu.zgyro * 1000.0f;
-		gyro.x = imu.xgyro;
-		gyro.y = imu.ygyro;
-		gyro.z = imu.zgyro;
-		gyro.temperature = imu.temperature;
+			struct gyro_report gyro = {};
 
-		if (_gyro_pub == nullptr) {
-			_gyro_pub = orb_advertise(ORB_ID(sensor_gyro), &gyro);
+			gyro.timestamp = timestamp;
+			gyro.x_raw = imu.xgyro * 1000.0f;
+			gyro.y_raw = imu.ygyro * 1000.0f;
+			gyro.z_raw = imu.zgyro * 1000.0f;
+			gyro.x = imu.xgyro;
+			gyro.y = imu.ygyro;
+			gyro.z = imu.zgyro;
+			gyro.temperature = imu.temperature;
 
-		} else {
-			orb_publish(ORB_ID(sensor_gyro), _gyro_pub, &gyro);
+			if (_gyro_pub == nullptr) {
+				_gyro_pub = orb_advertise(ORB_ID(sensor_gyro), &gyro);
+
+			} else {
+				orb_publish(ORB_ID(sensor_gyro), _gyro_pub, &gyro);
+			}
 		}
 	}
 
@@ -2102,6 +2110,7 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 		accel.y = imu.yacc;
 		accel.z = imu.zacc;
 		accel.temperature = imu.temperature;
+//		PX4_INFO("z acc = %.6f", (double)accel.z);
 
 		if (_accel_pub == nullptr) {
 			_accel_pub = orb_advertise(ORB_ID(sensor_accel), &accel);
@@ -2112,28 +2121,31 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 	}
 
 	/* magnetometer */
-	{
-		struct mag_report mag = {};
+	if (0) {
 
-		mag.timestamp = timestamp;
-		mag.x_raw = imu.xmag * 1000.0f;
-		mag.y_raw = imu.ymag * 1000.0f;
-		mag.z_raw = imu.zmag * 1000.0f;
-		mag.x = imu.xmag;
-		mag.y = imu.ymag;
-		mag.z = imu.zmag;
+		{
+			struct mag_report mag = {};
 
-		if (_mag_pub == nullptr) {
-			/* publish to the first mag topic */
-			_mag_pub = orb_advertise(ORB_ID(sensor_mag), &mag);
+			mag.timestamp = timestamp;
+			mag.x_raw = imu.xmag * 1000.0f;
+			mag.y_raw = imu.ymag * 1000.0f;
+			mag.z_raw = imu.zmag * 1000.0f;
+			mag.x = imu.xmag;
+			mag.y = imu.ymag;
+			mag.z = imu.zmag;
 
-		} else {
-			orb_publish(ORB_ID(sensor_mag), _mag_pub, &mag);
+			if (_mag_pub == nullptr) {
+				/* publish to the first mag topic */
+				_mag_pub = orb_advertise(ORB_ID(sensor_mag), &mag);
+
+			} else {
+				orb_publish(ORB_ID(sensor_mag), _mag_pub, &mag);
+			}
 		}
 	}
 
 	/* baro */
-	{
+	/*{
 		struct baro_report baro = {};
 
 		baro.timestamp = timestamp;
@@ -2141,19 +2153,19 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 		baro.altitude = imu.pressure_alt;
 		baro.temperature = imu.temperature;
 
-		/* fake device ID */
-		baro.device_id = 1234567;
+		*//* fake device ID *//*
+baro.device_id = 1234567;
 
-		if (_baro_pub == nullptr) {
-			_baro_pub = orb_advertise(ORB_ID(sensor_baro), &baro);
+if (_baro_pub == nullptr) {
+_baro_pub = orb_advertise(ORB_ID(sensor_baro), &baro);
 
-		} else {
-			orb_publish(ORB_ID(sensor_baro), _baro_pub, &baro);
-		}
-	}
+} else {
+orb_publish(ORB_ID(sensor_baro), _baro_pub, &baro);
+}
+}*/
 
 	/* battery status */
-	{
+	/*{
 		struct battery_status_s hil_battery_status = {};
 
 		hil_battery_status.timestamp = timestamp;
@@ -2168,7 +2180,7 @@ MavlinkReceiver::handle_message_hil_sensor(mavlink_message_t *msg)
 		} else {
 			orb_publish(ORB_ID(battery_status), _battery_pub, &hil_battery_status);
 		}
-	}
+	}*/
 
 	/* increment counters */
 	_hil_frames++;

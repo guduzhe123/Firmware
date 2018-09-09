@@ -384,12 +384,14 @@ MPU9250::init()
 	measure();
 
 	/* advertise sensor topic, measure manually to initialize valid report */
-	struct accel_report arp;
-	_accel_reports->get(&arp);
+	/*	struct accel_report arp;
+		_accel_reports->get(&arp);
 
-	/* measurement will have generated a report, publish */
-	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
-					   &_accel_orb_class_instance, (is_external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
+		*//* measurement will have generated a report, publish *//*
+_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
+&_accel_orb_class_instance, (is_external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);*/
+
+//    PX4_INFO("arb.z_raw = %.4f", (double)arp.z_raw);
 
 	if (_accel_topic == nullptr) {
 		PX4_ERR("ADVERT FAIL");
@@ -1542,11 +1544,14 @@ MPU9250::measure()
 		_gyro->parent_poll_notify();
 	}
 
+	accel_notify = false;
+
 	if (accel_notify && !(_pub_blocked)) {
 		/* log the time of this report */
 		perf_begin(_controller_latency_perf);
 		/* publish it */
 		orb_publish(ORB_ID(sensor_accel), _accel_topic, &arb);
+		PX4_INFO("arb.z_raw = %.4f", (double)arb.z_raw);
 	}
 
 	if (gyro_notify && !(_pub_blocked)) {
