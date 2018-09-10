@@ -162,6 +162,7 @@ private:
 		float thrust_auto;
 		float acc_rad;
 		float slow_down_rad;
+		float slow_down_sp;
 
 		float thrust_kp;
 		float thrust_ki;
@@ -193,6 +194,7 @@ private:
 		param_t thrust_auto;
 		param_t acc_rad;
 		param_t slow_down_rad;
+		param_t slow_down_sp;
 
 		param_t thrust_kp;
 		param_t thrust_ki;
@@ -221,6 +223,8 @@ private:
 	 */
 	bool		control_position(const math::Vector<2> &global_pos, const math::Vector<3> &ground_speed,
 					 const position_setpoint_triplet_s &_pos_sp_triplet);
+
+	void        control_offboard(float dt);
 
 	/**
 	 * Shim for calling task_main from task_create.

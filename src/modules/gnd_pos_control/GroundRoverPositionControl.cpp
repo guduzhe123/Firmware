@@ -90,6 +90,7 @@ GroundRoverPositionControl::GroundRoverPositionControl() :
 	_parameter_handles.thrust_auto = param_find("GND_THRUST_AUTO");
 	_parameter_handles.acc_rad = param_find("GND_ACCPT_RAD");
 	_parameter_handles.slow_down_rad = param_find("GND_SLOW_RAD");
+	_parameter_handles.slow_down_sp = param_find("GND_SLOW_SPEED");
 
 	_parameter_handles.thrust_kp = param_find("GND_THRUST_KP");
 	_parameter_handles.thrust_ki = param_find("GND_THRUST_KI");
@@ -150,6 +151,7 @@ GroundRoverPositionControl::parameters_update()
 
 	param_get(_parameter_handles.acc_rad, &(_parameters.acc_rad));
 	param_get(_parameter_handles.slow_down_rad, &(_parameters.slow_down_rad));
+	param_get(_parameter_handles.slow_down_sp, &(_parameters.slow_down_sp));
 	param_get(_parameter_handles.thrust_auto, &(_parameters.thrust_auto));
 
 	param_get(_parameter_handles.thrust_kp, &(_parameters.thrust_kp));
@@ -249,6 +251,15 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 	bool setpoint = true;
 
+	/*
+	    if (_control_mode.flag_control_offboard_enabled) {
+	        */
+	/* offboard control *//*
+
+	        control_offboard(dt);
+	    }
+	*/
+
 	if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
 		/* AUTONOMOUS FLIGHT */
 
@@ -281,7 +292,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			float mission_target_speed = _parameters.gndspeed_trim;
 
 			if (_gnd_pos_ctrl_status.wp_dist < _parameters.slow_down_rad) {
-				mission_target_speed = 1;
+				mission_target_speed = _parameters.slow_down_sp;
 
 			} else if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad) {
 				mission_target_speed = 0;
@@ -354,7 +365,8 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 //			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
 			if (!_achieved
-			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
+//			    && PX4_ISFINITE(pos_sp_triplet.current.yaw) && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
+			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {   // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
 				// pid calculate thrust.
 				_att_sp.thrust = mission_throttle;
 
@@ -362,11 +374,11 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			}
 
 
-			PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
-				 (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
-				 (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));
-
-			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
+//			PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
+//				 (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
+//				 (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));
+//
+//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
 
 			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
 				_att_sp.thrust = 0.0f;
@@ -497,21 +509,9 @@ GroundRoverPositionControl::task_main()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
-//			PX4_INFO("_achieved = %d", _achieved);
-//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.2f", (double)_gnd_pos_ctrl_status.wp_dist);
-//			PX4_INFO("_pos_sp_triplet.next.valid = %d", _pos_sp_triplet.next.valid);
-
-//			bool next;
-//			if (_pos_sp_triplet.next.valid){
-//				next = true;
-//			} else {
-//				next = false;
-//			}
-//			PX4_INFO("next = %d", next);
-
-//			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && _pos_sp_triplet.current.valid){
-//				_pos_sp_triplet.current.valid = false;
-//			}
+			PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
+				 (double)_pos_sp_triplet.current.x,
+				 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);
 
 			if (control_position(current_position, ground_speed, _pos_sp_triplet)) {
 				_att_sp.timestamp = hrt_absolute_time();
