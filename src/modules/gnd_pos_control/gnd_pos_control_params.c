@@ -275,7 +275,7 @@ PARAM_DEFINE_FLOAT(GND_THRUST_AUTO, 0.20f);
  * accept radium to stop thrust
  *
  *
- * @unit m/s
+ * @unit m
  * @min 0.0
  * @max 100
  * @group GND TECS
@@ -286,12 +286,23 @@ PARAM_DEFINE_FLOAT(GND_ACCPT_RAD, 2.0f);
  * accept radium to slow down
  *
  *
- * @unit m/s
+ * @unit m
  * @min 0.0
  * @max 100
  * @group GND TECS
  */
 PARAM_DEFINE_FLOAT(GND_SLOW_RAD, 5.0f);
+
+/**
+ *  slow down speed in accept radium
+ *
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 100
+ * @group GND TECS
+ */
+PARAM_DEFINE_FLOAT(GND_SLOW_SPEED, 0.5f);
 
 /**
  * thrust control kp

@@ -1790,6 +1790,8 @@ MulticopterPositionControl::control_non_manual(float dt)
 void
 MulticopterPositionControl::control_offboard(float dt)
 {
+	PX4_INFO("run offboard");
+
 	if (_pos_sp_triplet.current.valid) {
 
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
@@ -1802,6 +1804,7 @@ MulticopterPositionControl::control_offboard(float dt)
 
 		} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
 			/* control velocity */
+			PX4_INFO("_pos_sp_triplet.current.vx = %.2f", (double)_pos_sp_triplet.current.vx);
 
 			/* reset position setpoint to current position if needed */
 			reset_pos_sp();
