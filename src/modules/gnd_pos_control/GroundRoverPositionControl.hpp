@@ -64,6 +64,7 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_local_position.h>
 #include <uORB/uORB.h>
 
 using matrix::Dcmf;
@@ -106,6 +107,7 @@ private:
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
 	int     _att_sub{-1};
+	int     _local_pos_sub{-1};
 	float   _nav_bearing{};
 	float  _gnd_pos_dist_pre{};
 	float  _gnd_pos_dist_i{};
@@ -117,6 +119,7 @@ private:
 	vehicle_control_mode_s			_control_mode{};			/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
 	vehicle_attitude_s				_att {};	/**< control state */
+	vehicle_local_position_s        _local_pos{};
 
 	Subscription<vehicle_attitude_s>	_sub_attitude;
 	Subscription<sensor_bias_s>	_sub_sensors;
@@ -212,6 +215,7 @@ private:
 	void		position_setpoint_triplet_poll();
 	void		vehicle_control_mode_poll();
 	void		vehicle_attitude_poll();
+	void		vehicle_local_pos_poll();
 
 	/**
 	 * Publish navigation capabilities

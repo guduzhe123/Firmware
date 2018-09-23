@@ -225,6 +225,17 @@ GroundRoverPositionControl::vehicle_attitude_poll()
 	}
 }
 
+void
+GroundRoverPositionControl::vehicle_local_pos_poll()
+{
+	bool updated;
+	orb_check(_local_pos_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_local_position), _local_pos_sub, &_local_pos);
+	}
+}
+
 void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 {
 	_gnd_pos_ctrl_status.timestamp = hrt_absolute_time();
@@ -251,16 +262,55 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 	bool setpoint = true;
 
-	/*
-	    if (_control_mode.flag_control_offboard_enabled) {
-	        */
-	/* offboard control *//*
+	if (_control_mode.flag_control_offboard_enabled && pos_sp_triplet.current.valid) {
+		//	 offboard control
+//		PX4_INFO("_pos_sp_triplet.current.vx = %.2f", (double)_pos_sp_triplet.current.vx);
+		if (_pos_sp_triplet.current.valid) {
+			if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
+				/* float mission_throttle;
+				 float pos_err;*/
+				// turn yaw first, then control position.
+				PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
+					 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
+//                PX4_INFO()
 
-	        control_offboard(dt);
-	    }
-	*/
 
-	if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
+
+			} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
+				float mission_throttle;
+				float mission_target_speed = _pos_sp_triplet.current.vx;
+
+				// Velocity in body frame
+				const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
+				const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
+
+				const float x_vel = vel(0);
+				const float x_acc = _sub_sensors.get().accel_x;
+				PX4_INFO("mission_target_speed = %.2f, x_vel = %.2f, yaw_sp = %.2f", (double)mission_target_speed, (double)x_vel,
+					 (double)_pos_sp_triplet.current.yawspeed);
+
+
+				mission_throttle = _parameters.throttle_speed_scaler
+						   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
+
+				// Constrain throttle between min and max
+				mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
+				PX4_INFO("mission_throttle = %.2f", (double)mission_throttle);
+
+				_att_sp.roll_body = 0.0f;
+				_att_sp.pitch_body = 0.0f;
+				_att_sp.yaw_body = pos_sp_triplet.current.yawspeed;
+//                _att_sp.thrust = 0;
+				_att_sp.thrust = mission_throttle;
+
+			}
+
+		}
+
+//		control_offboard(dt);
+	}
+
+	else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
 		/* AUTONOMOUS FLIGHT */
 
 		_control_mode_current = UGV_POSCTRL_MODE_AUTO;
@@ -334,16 +384,28 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 		} else if ((pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION)
 			   || (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF)) {
-			PX4_INFO("pos_sp_triplet.current.yaw = %.2f", (double)pos_sp_triplet.current.yaw);
+			PX4_INFO("pos_sp_triplet.current.yaw = %.2f,  _gnd_control.nav_bearing() = %.2f, _nav_bearing = %.2f",
+				 (double)pos_sp_triplet.current.yaw,
+				 (double) _gnd_control.nav_bearing(), (double)_nav_bearing);
 
 			/* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
 			_gnd_control.navigate_waypoints(prev_wp, curr_wp, current_position, ground_speed_2d);
 			_att_sp.roll_body = _gnd_control.nav_roll();
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = _gnd_control.nav_bearing();
+//            _att_sp.yaw_body = _nav_bearing;
 
 			_att_sp.fw_control_yaw = true;
-			_att_sp.thrust = mission_throttle;
+//			_att_sp.thrust = mission_throttle;
+
+			Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
+
+			if (fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {
+				_att_sp.thrust = mission_throttle;
+
+			} else {
+				_att_sp.thrust = 0.05f;
+			}
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
 //			PX4_INFO("_gnd_control.nav_bearing() = %.2f, pos_sp_triplet.current.yaw = %.2f, _nav_bearing = %.2f",
@@ -359,26 +421,31 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			// only if target point is setted
 			_att_sp.fw_control_yaw = true;
 
-			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
-				_att_sp.yaw_body = _nav_bearing;
-			}
+//			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
+			_att_sp.yaw_body = _nav_bearing;
+//			    PX4_INFO("debug yaw_body = %.2f", (double)(_nav_bearing * 180.0f / 3.14f));
+//			}
 
 //			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
 			if (!_achieved
-//			    && PX4_ISFINITE(pos_sp_triplet.current.yaw) && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {   // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
+			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)
+			    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
+//			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {   // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
 				// pid calculate thrust.
 				_att_sp.thrust = mission_throttle;
 
 				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
+
+			} else {
+				_att_sp.thrust = 0.05f;
 			}
 
 
-//			PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
-//				 (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
-//				 (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));
+			/*	PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
+					 (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
+					 (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));*/
 //
-//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
+			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
 
 			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
 				_att_sp.thrust = 0.0f;
@@ -423,6 +490,7 @@ GroundRoverPositionControl::task_main()
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
+	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
@@ -499,6 +567,7 @@ GroundRoverPositionControl::task_main()
 			manual_control_setpoint_poll();
 			position_setpoint_triplet_poll();
 			vehicle_attitude_poll();
+			vehicle_local_pos_poll();
 			_sub_attitude.update();
 			_sub_sensors.update();
 
@@ -509,9 +578,9 @@ GroundRoverPositionControl::task_main()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
-			PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
-				 (double)_pos_sp_triplet.current.x,
-				 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);
+			/*			PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
+							 (double)_pos_sp_triplet.current.x,
+							 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);*/
 
 			if (control_position(current_position, ground_speed, _pos_sp_triplet)) {
 				_att_sp.timestamp = hrt_absolute_time();
@@ -520,7 +589,7 @@ GroundRoverPositionControl::task_main()
 				q.copyTo(_att_sp.q_d);
 				_att_sp.q_d_valid = true;
 
-				if (!_control_mode.flag_control_offboard_enabled ||
+				if (_control_mode.flag_control_offboard_enabled ||
 				    _control_mode.flag_control_position_enabled ||
 				    _control_mode.flag_control_velocity_enabled ||
 				    _control_mode.flag_control_acceleration_enabled) {

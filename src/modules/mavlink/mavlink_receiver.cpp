@@ -875,6 +875,7 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 		PX4_ISFINITE(set_position_target_local_ned.afy) &&
 		PX4_ISFINITE(set_position_target_local_ned.afz) &&
 		PX4_ISFINITE(set_position_target_local_ned.yaw);
+//	PX4_INFO("yaw_sp =%.2f, yaw_rate = %.2f", (double)set_position_target_local_ned.yaw, (double)set_position_target_local_ned.yaw_rate);
 
 	/* Only accept messages which are intended for this system */
 	if ((mavlink_system.sysid == set_position_target_local_ned.target_system ||

@@ -1790,7 +1790,6 @@ MulticopterPositionControl::control_non_manual(float dt)
 void
 MulticopterPositionControl::control_offboard(float dt)
 {
-	PX4_INFO("run offboard");
 
 	if (_pos_sp_triplet.current.valid) {
 
