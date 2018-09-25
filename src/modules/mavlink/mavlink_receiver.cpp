@@ -1018,6 +1018,7 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 					}
 
 					//XXX handle global pos setpoints (different MAV frames)
+					PX4_INFO(" mavlink pos_sp_triplet.cur.mode = %d", pos_sp_triplet.current.type);
 
 					if (_pos_sp_triplet_pub == nullptr) {
 						_pos_sp_triplet_pub = orb_advertise(ORB_ID(position_setpoint_triplet),

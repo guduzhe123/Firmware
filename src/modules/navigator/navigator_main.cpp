@@ -785,6 +785,7 @@ Navigator::publish_position_setpoint_triplet()
 		return;
 	}
 
+	PX4_INFO(" navigator pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
 //	PX4_INFO("publish pos update");
 
 	/* lazily publish the position setpoint triplet only once available */
