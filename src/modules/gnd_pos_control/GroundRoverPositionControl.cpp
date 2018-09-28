@@ -302,7 +302,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				//            _att_sp.thrust = 0.3f;
 				PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
 					 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
-				float local_pos_err = _pos_sp_triplet.current.x - _local_pos.x;
+				float local_pos_err = fabsf(_pos_sp_triplet.current.x - _local_pos.x);
 				float mission_target_speed = 0.2f * local_pos_err;
 
 				// Velocity in body frame
@@ -319,6 +319,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
 
 				_att_sp.thrust = mission_throttle;
+				PX4_INFO("thrust = %.2f", (double)_att_sp.thrust);
 
 
 			} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
