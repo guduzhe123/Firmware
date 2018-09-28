@@ -1173,6 +1173,7 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 				/* use current position */
 				if (commander_set_home_position(*home_pub, *home, *local_pos, *global_pos, *attitude, false)) {
 					cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+                    PX4_INFO("home_x = %.2f, home_y = %.2f, home_z = %.2f", (double)home->x, (double)home->y, (double)home->z);
 
 				} else {
 					cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;

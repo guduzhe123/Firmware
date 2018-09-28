@@ -840,6 +840,9 @@ MulticopterPositionControl::poll_subscriptions()
 
 	if (updated) {
 		orb_copy(ORB_ID(vehicle_local_position), _local_pos_sub, &_local_pos);
+		/*        _local_pos.x -= _home_pos.x;
+		        _local_pos.y -= _home_pos.y;
+		        _local_pos.z -= _home_pos.z;*/
 
 		// check if a reset event has happened
 		// if the vehicle is in manual mode we will shift the setpoints of the
@@ -856,6 +859,8 @@ MulticopterPositionControl::poll_subscriptions()
 			}
 		}
 
+//		PX4_INFO("local_x = %.2f, local_y = %.2f, local_z = %.2f", (double)_local_pos.x, (double)_local_pos.y, (double)_local_pos.z);
+//		PX4_INFO("home_x = %.2f, home_y = %.2f, home_z = %.2f", (double)_home_pos.x, (double)_home_pos.y, (double)_home_pos.z);
 		// update the reset counters in any case
 		_z_reset_counter = _local_pos.z_reset_counter;
 		_xy_reset_counter = _local_pos.xy_reset_counter;
