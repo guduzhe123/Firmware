@@ -136,7 +136,7 @@ PARAM_DEFINE_FLOAT(GND_THR_MAX, 0.3f);
  * @increment 0.01
  * @group GND POS Control
  */
-PARAM_DEFINE_FLOAT(GND_THR_MIN, 0.0f);
+PARAM_DEFINE_FLOAT(GND_THR_MIN, 0.05f);
 
 /**
  * Idle throttle
