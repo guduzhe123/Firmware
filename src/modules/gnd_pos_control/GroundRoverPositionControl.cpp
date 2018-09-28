@@ -260,6 +260,16 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 	}
 }
 
+//void GroundRoverPositionControl::vehicle_local_pos_poll()
+//{
+//	bool local_pos_updated;
+//	orb_check(_vehicle_local_pos_sub, &local_pos_updated);
+//
+//	if (local_pos_updated) {
+//		orb_copy(ORB_ID(vehicle_local_position), _vehicle_local_pos_sub, &_local_pos);
+//	}
+//}
+
 bool
 GroundRoverPositionControl::control_position(const math::Vector<2> &current_position,
 		const math::Vector<3> &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
@@ -274,7 +284,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 	bool setpoint = true;
 
-	if (_control_mode.flag_control_offboard_enabled && pos_sp_triplet.current.valid) {
+	if (_control_mode.flag_control_offboard_enabled) {
 		//	 offboard control
 //		PX4_INFO("_pos_sp_triplet.current.vx = %.2f", (double)_pos_sp_triplet.current.vx);
 		if (_pos_sp_triplet.current.valid) {
@@ -285,7 +295,30 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 					 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
 //                PX4_INFO()
+				_att_sp.roll_body = 0.0f;
+				_att_sp.pitch_body = 0.0f;
+				_att_sp.yaw_body = _wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
+				_att_sp.fw_control_yaw = true;
+				//            _att_sp.thrust = 0.3f;
+				PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
+					 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
+				float local_pos_err = _pos_sp_triplet.current.x - _local_pos.x;
+				float mission_target_speed = 0.2f * local_pos_err;
 
+				// Velocity in body frame
+				const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
+				const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
+
+				const float x_vel = vel(0);
+				const float x_acc = _sub_sensors.get().accel_x;
+
+				float mission_throttle;
+				mission_throttle = _parameters.throttle_speed_scaler
+						   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
+				// Constrain throttle between min and max
+				mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
+
+				_att_sp.thrust = mission_throttle;
 
 
 			} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
@@ -609,7 +642,6 @@ GroundRoverPositionControl::task_main()
 				    _control_mode.flag_control_position_enabled ||
 				    _control_mode.flag_control_velocity_enabled ||
 				    _control_mode.flag_control_acceleration_enabled) {
-
 					/* lazily publish the setpoint only once available */
 					if (_attitude_sp_pub != nullptr) {
 						/* publish the attitude setpoint */

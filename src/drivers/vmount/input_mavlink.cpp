@@ -267,6 +267,8 @@ int InputMavlinkCmdMount::update_impl(unsigned int timeout_ms, ControlData **con
 					// both specs have yaw on channel 2
 					_control_data.type_data.angle.angles[2] = vehicle_command.param3 * M_DEG_TO_RAD_F;
 
+					PX4_INFO("vcmd: pitch=%.2f, roll=%.2f", (double)vehicle_command.param1, (double)vehicle_command.param2);
+
 					// We expect angle of [-pi..+pi]. If the input range is [0..2pi] we can fix that.
 					if (_control_data.type_data.angle.angles[2] > M_PI_F) {
 						_control_data.type_data.angle.angles[2] -= 2 * M_PI_F;
