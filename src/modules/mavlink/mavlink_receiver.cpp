@@ -882,7 +882,8 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 				orb_copy(ORB_ID(vehicle_control_mode), _control_mode_sub, &_control_mode);
 			}
 
-			if (_control_mode.flag_control_offboard_enabled) {
+			if (1) {
+//			if (_control_mode.flag_control_offboard_enabled) {
 				if (is_force_sp && offboard_control_mode.ignore_position &&
 				    offboard_control_mode.ignore_velocity) {
 
@@ -911,7 +912,8 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 						pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_IDLE;
 
 					} else {
-						pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+//						pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+						pos_sp_triplet.current.type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 					}
 
 					/* set the local pos values */
@@ -980,7 +982,7 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 					}
 
 					//XXX handle global pos setpoints (different MAV frames)
-					PX4_INFO(" mavlink pos_sp_triplet.cur.mode = %d", pos_sp_triplet.current.type);
+//					PX4_INFO(" mavlink pos_sp_triplet.cur.mode = %d", pos_sp_triplet.current.type);
 
 					if (_pos_sp_triplet_pub == nullptr) {
 						_pos_sp_triplet_pub = orb_advertise(ORB_ID(position_setpoint_triplet),

@@ -396,7 +396,7 @@ Navigator::task_main()
 				rep->current.cruising_speed = get_cruising_speed();
 				rep->current.cruising_throttle = get_cruising_throttle();
 
-				PX4_INFO("cmd.param4 = %.2f, cmd.param5 = %.8f,cmd.param6 = %.8f,cmd.param7 = %.2f",
+				PX4_INFO("cmd.yaw = %.2f, cmd.lat = %.8f,cmd.lon = %.8f,cmd.alt = %.2f",
 					 (double)cmd.param4, (double)cmd.param5, (double)cmd.param6, (double)cmd.param7);
 
 				// Go on and check which changes had been requested
