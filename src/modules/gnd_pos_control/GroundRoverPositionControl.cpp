@@ -211,7 +211,7 @@ GroundRoverPositionControl::position_setpoint_triplet_poll()
 
 	if (pos_sp_triplet_updated) {
 		orb_copy(ORB_ID(position_setpoint_triplet), _pos_sp_triplet_sub, &_pos_sp_triplet);
-		PX4_INFO("pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
+//		PX4_INFO("pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
 	}
 }
 
@@ -270,6 +270,77 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 //	}
 //}
 
+void
+GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &ground_speed,
+		const position_setpoint_triplet_s &pos_sp_triplet)
+{
+	if (_pos_sp_triplet.current.valid) {
+		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
+			/* float mission_throttle;
+			 float pos_err;*/
+			// turn yaw first, then control position.
+			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
+				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
+//                PX4_INFO()
+			_att_sp.roll_body = 0.0f;
+			_att_sp.pitch_body = 0.0f;
+			_att_sp.yaw_body = _wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
+			_att_sp.fw_control_yaw = true;
+			//            _att_sp.thrust = 0.3f;
+			PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
+				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
+			float local_pos_err = fabsf(_pos_sp_triplet.current.x - _local_pos.x);
+			float mission_target_speed = 0.2f * local_pos_err;
+
+			// Velocity in body frame
+			const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
+			const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
+
+			const float x_vel = vel(0);
+			const float x_acc = _sub_sensors.get().accel_x;
+
+			float mission_throttle;
+			mission_throttle = _parameters.throttle_speed_scaler
+					   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
+			// Constrain throttle between min and max
+			mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
+
+			_att_sp.thrust = mission_throttle;
+			PX4_INFO("thrust = %.2f", (double)_att_sp.thrust);
+
+
+		} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
+			float mission_throttle;
+			float mission_target_speed = _pos_sp_triplet.current.vx;
+
+			// Velocity in body frame
+			const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
+			const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
+
+			const float x_vel = vel(0);
+			const float x_acc = _sub_sensors.get().accel_x;
+			PX4_INFO("mission_target_speed = %.2f, x_vel = %.2f, yaw_sp = %.2f", (double)mission_target_speed, (double)x_vel,
+				 (double)_pos_sp_triplet.current.yawspeed);
+
+
+			mission_throttle = _parameters.throttle_speed_scaler
+					   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
+
+			// Constrain throttle between min and max
+			mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
+			PX4_INFO("mission_throttle = %.2f", (double)mission_throttle);
+
+			_att_sp.roll_body = 0.0f;
+			_att_sp.pitch_body = 0.0f;
+			_att_sp.yaw_body = pos_sp_triplet.current.yawspeed;
+//                _att_sp.thrust = 0;
+			_att_sp.thrust = mission_throttle;
+
+		}
+
+	}
+}
+
 bool
 GroundRoverPositionControl::control_position(const math::Vector<2> &current_position,
 		const math::Vector<3> &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
@@ -287,76 +358,13 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 	if (_control_mode.flag_control_offboard_enabled) {
 		//	 offboard control
 //		PX4_INFO("_pos_sp_triplet.current.vx = %.2f", (double)_pos_sp_triplet.current.vx);
-		if (_pos_sp_triplet.current.valid) {
-			if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
-				/* float mission_throttle;
-				 float pos_err;*/
-				// turn yaw first, then control position.
-				PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
-					 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
-//                PX4_INFO()
-				_att_sp.roll_body = 0.0f;
-				_att_sp.pitch_body = 0.0f;
-				_att_sp.yaw_body = _wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
-				_att_sp.fw_control_yaw = true;
-				//            _att_sp.thrust = 0.3f;
-				PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
-					 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
-				float local_pos_err = fabsf(_pos_sp_triplet.current.x - _local_pos.x);
-				float mission_target_speed = 0.2f * local_pos_err;
 
-				// Velocity in body frame
-				const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
-				const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
-
-				const float x_vel = vel(0);
-				const float x_acc = _sub_sensors.get().accel_x;
-
-				float mission_throttle;
-				mission_throttle = _parameters.throttle_speed_scaler
-						   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
-				// Constrain throttle between min and max
-				mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
-
-				_att_sp.thrust = mission_throttle;
-				PX4_INFO("thrust = %.2f", (double)_att_sp.thrust);
-
-
-			} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
-				float mission_throttle;
-				float mission_target_speed = _pos_sp_triplet.current.vx;
-
-				// Velocity in body frame
-				const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
-				const Vector3f vel = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
-
-				const float x_vel = vel(0);
-				const float x_acc = _sub_sensors.get().accel_x;
-				PX4_INFO("mission_target_speed = %.2f, x_vel = %.2f, yaw_sp = %.2f", (double)mission_target_speed, (double)x_vel,
-					 (double)_pos_sp_triplet.current.yawspeed);
-
-
-				mission_throttle = _parameters.throttle_speed_scaler
-						   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
-
-				// Constrain throttle between min and max
-				mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
-				PX4_INFO("mission_throttle = %.2f", (double)mission_throttle);
-
-				_att_sp.roll_body = 0.0f;
-				_att_sp.pitch_body = 0.0f;
-				_att_sp.yaw_body = pos_sp_triplet.current.yawspeed;
-//                _att_sp.thrust = 0;
-				_att_sp.thrust = mission_throttle;
-
-			}
-
-		}
-
-//		control_offboard(dt);
+		control_offboard(dt, ground_speed, pos_sp_triplet);
 	}
 
 	else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
+//        PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
+//                 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
 		/* AUTONOMOUS FLIGHT */
 
 		_control_mode_current = UGV_POSCTRL_MODE_AUTO;
@@ -453,58 +461,63 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_att_sp.thrust = 0.05f;
 			}
 
-			PX4_INFO("_vehicle_status.nav_state = %d", _vehicle_status.nav_state);
+//			PX4_INFO("_vehicle_status.nav_state = %d", _vehicle_status.nav_state);
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-//			PX4_INFO("_gnd_control.nav_bearing() = %.2f, pos_sp_triplet.current.yaw = %.2f, _nav_bearing = %.2f",
-//				 (double)_gnd_control.nav_bearing(), (double)pos_sp_triplet.current.yaw, (double)_nav_bearing);
-			/* waypoint is a loiter waypoint so we want to stop*/
-			_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
-						     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
+			PX4_INFO("_pos_sp_triplet.current.x = %.2f", (double)_pos_sp_triplet.current.x);
 
-			Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
-			_att_sp.roll_body = _gnd_control.nav_roll();
-			_att_sp.pitch_body = 0.0f;
-			_att_sp.yaw_body = euler_angles.psi(); // needs actual att now. so actuators don't move when change hold mode
-			// only if target point is setted
-			_att_sp.fw_control_yaw = true;
+			/* waypoint is a loiter waypoint so we want to stop*/
+			if (pos_sp_triplet.current.position_valid || pos_sp_triplet.current.velocity_valid) {
+				control_offboard(dt, ground_speed, pos_sp_triplet);
+
+			} else {
+				// TODO need to know the target of the whole mission. 任务目标经纬度
+				_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
+							     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
+
+				Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
+				_att_sp.roll_body = _gnd_control.nav_roll();
+				_att_sp.pitch_body = 0.0f;
+				_att_sp.yaw_body = euler_angles.psi(); // needs actual att now. so actuators don't move when change hold mode
+				// only if target point is setted
+				_att_sp.fw_control_yaw = true;
 
 //			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
-			_att_sp.yaw_body = _nav_bearing;
+				_att_sp.yaw_body = _nav_bearing;
 //			    PX4_INFO("debug yaw_body = %.2f", (double)(_nav_bearing * 180.0f / 3.14f));
 //			}
 
-//			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-			if (!_achieved
-			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)
-			    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
+//			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
+				if (!_achieved
+				    && PX4_ISFINITE(pos_sp_triplet.current.yaw)
+				    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
 //			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {   // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-				// pid calculate thrust.
-				_att_sp.thrust = mission_throttle;
+					// pid calculate thrust.
+					_att_sp.thrust = mission_throttle;
 
-				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
+					_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 
-			} else {
-				_att_sp.thrust = 0.05f;
-			}
+				} else {
+					_att_sp.thrust = 0.05f;
+				}
 
 
-			/*	PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
-					 (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
-					 (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));*/
+				/*	PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
+				         (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
+				         (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));*/
 //
 //			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
 //			PX4_INFO("pos_sp_triplet.cur.mode = %d", pos_sp_triplet.current.type);
 
-			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
-				_att_sp.thrust = 0.0f;
-				_achieved = true;
+				if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
+					_att_sp.thrust = 0.0f;
+					_achieved = true;
 //				pos_sp_triplet.current.valid = false;
 
-			} else {
-				_achieved = false;
+				} else {
+					_achieved = false;
+				}
 			}
-
 
 //			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f", (double)_att_sp.thrust, (double)_att_sp.yaw_body);
 		}
