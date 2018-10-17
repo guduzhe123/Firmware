@@ -130,6 +130,7 @@ set(msg_files
 	pid_auto_tune.msg
 	user_intention.msg
 	gps_status_flag.msg
+	position_setpoint_copy.msg
 	)
 
 px4_add_git_submodule(TARGET git_gencpp PATH tools/gencpp)

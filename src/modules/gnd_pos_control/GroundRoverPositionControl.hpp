@@ -59,6 +59,7 @@
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/position_setpoint_triplet.h>
+#include <uORB/topics/position_setpoint_copy.h>
 #include <uORB/topics/sensor_bias.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
@@ -107,6 +108,7 @@ private:
 	int		_manual_control_sub{-1};		/**< notification of manual control updates */
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
+	int		_pos_sp_copy_sub{-1};
 	int     _att_sub{-1};
 	int     _local_pos_sub{-1};
 	int     _vehicle_status_sub{-1};
@@ -117,6 +119,7 @@ private:
 	fw_pos_ctrl_status_s			_gnd_pos_ctrl_status{};		/**< navigation capabilities */
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
 	position_setpoint_triplet_s		_pos_sp_triplet{};		/**< triplet of mission items */
+	position_setpoint_copy_s		_pos_sp_copy{};		/**< triplet of mission items */
 	vehicle_attitude_setpoint_s		_att_sp{};			/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_control_mode{};			/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
@@ -220,6 +223,7 @@ private:
 	void		vehicle_attitude_poll();
 	void		vehicle_local_pos_poll();
 	void        vehicle_status_poll();
+	void        position_setpoint_copy_poll();
 	/**
 	 * Publish navigation capabilities
 	 */

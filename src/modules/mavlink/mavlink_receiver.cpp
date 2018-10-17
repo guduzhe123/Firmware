@@ -979,6 +979,8 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 						pos_sp_triplet.current.velocity_valid = false;
 					}
 
+//                    PX4_INFO("pos_sp_triplet.current.velocity_valid = %d", pos_sp_triplet.current.velocity_valid);
+
 					if (!offboard_control_mode.ignore_alt_hold) {
 						pos_sp_triplet.current.alt_valid = true;
 						pos_sp_triplet.current.z = set_position_target_local_ned.z;
