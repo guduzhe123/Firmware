@@ -65,6 +65,7 @@
 #include <uORB/topics/mission_result.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/position_setpoint_triplet.h>
+#include <uORB/topics/position_setpoint_copy.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
@@ -269,6 +270,7 @@ private:
 	orb_advert_t	_mavlink_log_pub{nullptr};	/**< the uORB advert to send messages over mavlink */
 	orb_advert_t	_mission_result_pub{nullptr};
 	orb_advert_t	_pos_sp_triplet_pub{nullptr};
+	orb_advert_t	_pos_sp_copy_pub{nullptr};
 	orb_advert_t	_vehicle_cmd_ack_pub{nullptr};
 	orb_advert_t	_vehicle_cmd_pub{nullptr};
 	orb_advert_t	_vehicle_roi_pub{nullptr};
@@ -287,6 +289,7 @@ private:
 	// Publications
 	geofence_result_s				_geofence_result{};
 	position_setpoint_triplet_s			_pos_sp_triplet{};	/**< triplet of position setpoints */
+	position_setpoint_copy_s			_pos_sp_copy{};	/**< triplet of position setpoints copy */
 	position_setpoint_triplet_s			_reposition_triplet{};	/**< triplet for non-mission direct position command */
 	position_setpoint_triplet_s			_takeoff_triplet{};	/**< triplet for non-mission direct takeoff command */
 	vehicle_roi_s					_vroi{};		/**< vehicle ROI */

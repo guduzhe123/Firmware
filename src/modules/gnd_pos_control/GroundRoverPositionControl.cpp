@@ -216,6 +216,18 @@ GroundRoverPositionControl::position_setpoint_triplet_poll()
 }
 
 void
+GroundRoverPositionControl::position_setpoint_copy_poll()
+{
+	bool pos_sp_copy_updated;
+	orb_check(_pos_sp_copy_sub, &pos_sp_copy_updated);
+
+	if (pos_sp_copy_updated) {
+		orb_copy(ORB_ID(position_setpoint_copy), _pos_sp_copy_sub, &_pos_sp_copy);
+//		PX4_INFO("pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
+	}
+}
+
+void
 GroundRoverPositionControl::vehicle_attitude_poll()
 {
 	bool updated;
@@ -438,9 +450,6 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 		} else if ((pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION)
 			   || (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF)) {
-			/*			PX4_INFO("pos_sp_triplet.current.yaw = %.2f,  _gnd_control.nav_bearing() = %.2f, _nav_bearing = %.2f",
-							 (double)pos_sp_triplet.current.yaw,
-							 (double) _gnd_control.nav_bearing(), (double)_nav_bearing);*/
 
 			/* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
 			_gnd_control.navigate_waypoints(prev_wp, curr_wp, current_position, ground_speed_2d);
@@ -461,17 +470,26 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				_att_sp.thrust = 0.05f;
 			}
 
-//			PX4_INFO("_vehicle_status.nav_state = %d", _vehicle_status.nav_state);
-
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-			PX4_INFO("_pos_sp_triplet.current.x = %.2f", (double)_pos_sp_triplet.current.x);
+
+			// TODO change mavlink receiver commmand namek
 
 			/* waypoint is a loiter waypoint so we want to stop*/
-			if (pos_sp_triplet.current.position_valid || pos_sp_triplet.current.velocity_valid) {
+			PX4_INFO("_pos_sp_triplet.timestamp = %d, hrt_absolute_time() = %d, err = %d", pos_sp_triplet.timestamp,
+				 hrt_absolute_time(), (hrt_absolute_time() - pos_sp_triplet.timestamp));
+
+			if (hrt_absolute_time() - pos_sp_triplet.timestamp < 3e+6) { // less than 3 secs
 				control_offboard(dt, ground_speed, pos_sp_triplet);
 
 			} else {
+				/* previous waypoint */
+				PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
+				PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));
+
 				// TODO need to know the target of the whole mission. 任务目标经纬度
+				curr_wp(0) = _pos_sp_copy.current.lat;
+				curr_wp(1) = _pos_sp_copy.current.lon;
+
 				_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
 							     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
 
@@ -482,10 +500,11 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				// only if target point is setted
 				_att_sp.fw_control_yaw = true;
 
-//			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
+
+				_nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
+						curr_wp(1));
+
 				_att_sp.yaw_body = _nav_bearing;
-//			    PX4_INFO("debug yaw_body = %.2f", (double)(_nav_bearing * 180.0f / 3.14f));
-//			}
 
 //			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
 				if (!_achieved
@@ -501,25 +520,14 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 					_att_sp.thrust = 0.05f;
 				}
 
-
-				/*	PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
-				         (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
-				         (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));*/
-//
-//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
-//			PX4_INFO("pos_sp_triplet.cur.mode = %d", pos_sp_triplet.current.type);
-
 				if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
 					_att_sp.thrust = 0.0f;
 					_achieved = true;
-//				pos_sp_triplet.current.valid = false;
 
 				} else {
 					_achieved = false;
 				}
 			}
-
-//			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f", (double)_att_sp.thrust, (double)_att_sp.yaw_body);
 		}
 
 		if (was_circle_mode && !_gnd_control.circle_mode()) {
@@ -551,6 +559,7 @@ GroundRoverPositionControl::task_main()
 	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
+	_pos_sp_copy_sub = orb_subscribe(ORB_ID(position_setpoint_copy));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
 
@@ -628,6 +637,7 @@ GroundRoverPositionControl::task_main()
 
 			manual_control_setpoint_poll();
 			position_setpoint_triplet_poll();
+			position_setpoint_copy_poll();
 			vehicle_attitude_poll();
 			vehicle_local_pos_poll();
 			vehicle_status_poll();
