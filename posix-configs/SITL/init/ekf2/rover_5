@@ -69,7 +69,7 @@ gnd_pos_control start
 gnd_att_control start
 mixer load /dev/pwm_output0 ROMFS/sitl/mixers/rover_sitl.main.mix
 mavlink start -x -u 14555 -r 4000000
-mavlink start -x -u 14556 -r 4000000 -m onboard -o 14540
+mavlink start -x -u 14530 -r 4000000 -m onboard -o 14545
 mavlink stream -r 80 -s POSITION_TARGET_LOCAL_NED -u 14555
 mavlink stream -r 80 -s LOCAL_POSITION_NED -u 14555
 mavlink stream -r 80 -s GLOBAL_POSITION_INT -u 14555

@@ -47,7 +47,7 @@ param set SITL_UDP_PRT 14563
 param set SYS_AUTOSTART 4010
 param set SYS_MC_EST_GROUP 2
 param set SYS_RESTART_TYPE 2
-param set MPC_YAW_MODE 4
+#param set MPC_YAW_MODE 4
 param set MPC_XY_VEL_MAX 3
 replay tryapplyparams
 simulator start -s
