@@ -138,7 +138,7 @@
             <arg name="P" value="0"/>
             <arg name="Y" value="0"/>
             <arg name="mavlink_udp_port" value="14565"/>
-            <arg name="vehicle" value="rover"/>
+            <arg name="vehicle" value="rover_5"/>
             <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/rover_$(arg ID)"/>
             <arg name="ID" value="$(arg ID)"/>
         </include>

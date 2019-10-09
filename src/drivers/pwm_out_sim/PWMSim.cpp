@@ -82,6 +82,7 @@ PWMSim::set_mode(Mode mode)
 
 	case MODE_16PWM:
 		PX4_INFO("MODE_16PWM");
+		PX4_INFO("1111111\n");
 		/* multi-port as 16 PWM outs */
 		_update_rate = 400;	/* default output rate */
 		_num_outputs = 16;

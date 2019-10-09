@@ -59,11 +59,14 @@
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/position_setpoint_triplet.h>
+#include <uORB/topics/position_setpoint_copy.h>
 #include <uORB/topics/sensor_bias.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_local_position.h>
+#include <uORB/topics/vehicle_status.h>
 #include <uORB/uORB.h>
 
 using matrix::Dcmf;
@@ -98,19 +101,31 @@ private:
 
 	bool		_task_should_exit{false};		/**< if true, sensor task should exit */
 	bool		_task_running{false};			/**< if true, task is running in its mainloop */
+	bool        _achieved{false};              /* true if vehicle achieved the target point*/
 
 	int		_control_mode_sub{-1};		/**< control mode subscription */
 	int		_global_pos_sub{-1};
 	int		_manual_control_sub{-1};		/**< notification of manual control updates */
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
+	int		_pos_sp_copy_sub{-1};
+	int     _att_sub{-1};
+	int     _local_pos_sub{-1};
+	int     _vehicle_status_sub{-1};
+	float   _nav_bearing{};
+	float  _gnd_pos_dist_pre{};
+	float  _gnd_pos_dist_i{};
 
 	fw_pos_ctrl_status_s			_gnd_pos_ctrl_status{};		/**< navigation capabilities */
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
 	position_setpoint_triplet_s		_pos_sp_triplet{};		/**< triplet of mission items */
+	position_setpoint_copy_s		_pos_sp_copy{};		/**< triplet of mission items */
 	vehicle_attitude_setpoint_s		_att_sp{};			/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_control_mode{};			/**< control mode */
 	vehicle_global_position_s		_global_pos{};			/**< global vehicle position */
+	vehicle_attitude_s				_att {};	/**< control state */
+	vehicle_local_position_s        _local_pos{};
+	vehicle_status_s                _vehicle_status{};
 
 	Subscription<vehicle_attitude_s>	_sub_attitude;
 	Subscription<sensor_bias_s>	_sub_sensors;
@@ -153,6 +168,15 @@ private:
 		float throttle_cruise;
 		float throttle_slew_max;
 
+		float thrust_auto;
+		float acc_rad;
+		float slow_down_rad;
+		float slow_down_sp;
+
+		float thrust_kp;
+		float thrust_ki;
+		float thrust_kd;
+
 	} _parameters{};			/**< local copies of interesting parameters */
 
 	struct {
@@ -176,6 +200,15 @@ private:
 		param_t throttle_cruise;
 		param_t throttle_slew_max;
 
+		param_t thrust_auto;
+		param_t acc_rad;
+		param_t slow_down_rad;
+		param_t slow_down_sp;
+
+		param_t thrust_kp;
+		param_t thrust_ki;
+		param_t thrust_kd;
+
 	} _parameter_handles{};		/**< handles for interesting parameters */
 
 
@@ -187,7 +220,10 @@ private:
 	void		manual_control_setpoint_poll();
 	void		position_setpoint_triplet_poll();
 	void		vehicle_control_mode_poll();
-
+	void		vehicle_attitude_poll();
+	void		vehicle_local_pos_poll();
+	void        vehicle_status_poll();
+	void        position_setpoint_copy_poll();
 	/**
 	 * Publish navigation capabilities
 	 */
@@ -198,6 +234,9 @@ private:
 	 */
 	bool		control_position(const matrix::Vector2f &global_pos, const matrix::Vector3f &ground_speed,
 					 const position_setpoint_triplet_s &_pos_sp_triplet);
+
+	void        control_offboard(float dt, const matrix::Vector3f &ground_speed,
+				     const position_setpoint_triplet_s &pos_sp_triplet);
 
 	/**
 	 * Shim for calling task_main from task_create.

@@ -1911,6 +1911,7 @@ Mavlink::task_main(int argc, char *argv[])
 
 		PX4_INFO("mode: %s, data rate: %d B/s on %s @ %dB",
 			 mavlink_mode_str(_mode), _datarate, _device_name, _baudrate);
+		PX4_INFO("mavlink mode !!!!!\n");
 
 		/* flush stdout in case MAVLink is about to take it over */
 		fflush(stdout);

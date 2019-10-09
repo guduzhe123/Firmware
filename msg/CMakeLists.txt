@@ -130,6 +130,7 @@ set(msg_files
 	vehicle_status_flags.msg
 	vtol_vehicle_status.msg
 	wind_estimate.msg
+	position_setpoint_copy.msg
 	)
 
 if(NOT EXTERNAL_MODULES_LOCATION STREQUAL "")
