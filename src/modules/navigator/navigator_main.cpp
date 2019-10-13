@@ -839,6 +839,16 @@ Navigator::publish_position_setpoint_triplet()
 	} else {
 		_pos_sp_triplet_pub = orb_advertise(ORB_ID(position_setpoint_triplet), &_pos_sp_triplet);
 	}
+
+	if (_pos_sp_copy_pub != nullptr) {
+		orb_publish(ORB_ID(position_setpoint_copy), _pos_sp_copy_pub, &_pos_sp_triplet);
+
+	} else {
+		_pos_sp_copy_pub = orb_advertise(ORB_ID(position_setpoint_copy), &_pos_sp_triplet);
+	}
+
+/*	PX4_INFO("copy(0) = %.6f, copy(1) = %.6f", (double)_pos_sp_triplet.previous.lat, (double)_pos_sp_triplet.previous.lon);
+	PX4_INFO("curr(0) = %.6f, curr(1) = %.6f", (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.lon);*/
 }
 
 float

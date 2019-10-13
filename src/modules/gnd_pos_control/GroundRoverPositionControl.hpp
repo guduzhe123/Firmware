@@ -236,7 +236,7 @@ private:
 					 const position_setpoint_triplet_s &_pos_sp_triplet);
 
 	void        control_offboard(float dt, const matrix::Vector3f &ground_speed,
-				     const position_setpoint_triplet_s &pos_sp_triplet);
+				     const position_setpoint_triplet_s &pos_sp_triplet, const matrix::Vector2f &current_position);
 
 	/**
 	 * Shim for calling task_main from task_create.
@@ -247,5 +247,9 @@ private:
 	 * Main sensor collection task.
 	 */
 	void		task_main();
+
+    float wrap_pi(float bearing);
+
+    void check_achieved(const position_setpoint_triplet_s &pos_sp_triplet, float mission_throttle);
 
 };

@@ -286,22 +286,18 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 
 void
 GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &ground_speed,
-		const position_setpoint_triplet_s &pos_sp_triplet)
+		const position_setpoint_triplet_s &pos_sp_triplet, const matrix::Vector2f &current_position)
 {
 	if (_pos_sp_triplet.current.valid) {
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
-			/* float mission_throttle;
-			 float pos_err;*/
 			// turn yaw first, then control position.
 			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
-//                PX4_INFO()
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
-//			_att_sp.yaw_body = _wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
-			_att_sp.yaw_body = _nav_bearing;
+			_att_sp.yaw_body = wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
 			_att_sp.fw_control_yaw = true;
-			//            _att_sp.thrust = 0.3f;
+
 			PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
 				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
 			float local_pos_err = fabsf(_pos_sp_triplet.current.x - _local_pos.x);
@@ -321,8 +317,9 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
 
 			_att_sp.thrust = mission_throttle;
-			PX4_INFO("thrust = %.2f", (double)_att_sp.thrust);
 
+            check_achieved(pos_sp_triplet, mission_throttle);
+            PX4_INFO("thrust = %.2f", (double)_att_sp.thrust);
 
 		} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
 			float mission_throttle;
@@ -348,11 +345,8 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = pos_sp_triplet.current.yawspeed;
-//                _att_sp.thrust = 0;
 			_att_sp.thrust = mission_throttle;
-
 		}
-
 	}
 }
 
@@ -360,8 +354,6 @@ bool
 GroundRoverPositionControl::control_position(const matrix::Vector2f &current_position,
 		const matrix::Vector3f &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
 {
-	    printf("control position------!\n");
-	    PX4_INFO("control position!\n");
 	float dt = 0.01; // Using non zero value to a avoid division by zero
 
 	if (_control_position_last_called > 0) {
@@ -376,10 +368,9 @@ GroundRoverPositionControl::control_position(const matrix::Vector2f &current_pos
 		//	 offboard control
 //		PX4_INFO("_pos_sp_triplet.current.vx = %.2f", (double)_pos_sp_triplet.current.vx);
 
-		control_offboard(dt, ground_speed, pos_sp_triplet);
-	}
+		control_offboard(dt, ground_speed, pos_sp_triplet, current_position);
 
-	else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
+	}	else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
 //        PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 //                 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
 		/* AUTONOMOUS FLIGHT */
@@ -474,20 +465,16 @@ GroundRoverPositionControl::control_position(const matrix::Vector2f &current_pos
 			}
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-
-			// TODO change mavlink receiver commmand namek
-
+			// TODO change mavlink receiver commmand name
 			/* waypoint is a loiter waypoint so we want to stop*/
-			PX4_INFO("_pos_sp_triplet.timestamp = %d, hrt_absolute_time() = %d, err = %d", pos_sp_triplet.timestamp,
-				 hrt_absolute_time(), (hrt_absolute_time() - pos_sp_triplet.timestamp));
+/*			PX4_INFO("_pos_sp_triplet.timestamp = %d, hrt_absolute_time() = %d, err = %d", pos_sp_triplet.timestamp,
+				 hrt_absolute_time(), (hrt_absolute_time() - pos_sp_triplet.timestamp));*/
 
 			if (hrt_absolute_time() - pos_sp_triplet.timestamp < 3e+6) { // less than 3 secs
-				control_offboard(dt, ground_speed, pos_sp_triplet);
+				control_offboard(dt, ground_speed, pos_sp_triplet, current_position); // why?
 
 			} else {
 				/* previous waypoint */
-				PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
-				PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));
 
 				// TODO need to know the target of the whole mission. 任务目标经纬度
 				curr_wp(0) = _pos_sp_copy.current.lat;
@@ -496,10 +483,8 @@ GroundRoverPositionControl::control_position(const matrix::Vector2f &current_pos
 				_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
 							     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
 
-				Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
 				_att_sp.roll_body = _gnd_control.nav_roll();
 				_att_sp.pitch_body = 0.0f;
-				_att_sp.yaw_body = euler_angles.psi(); // needs actual att now. so actuators don't move when change hold mode
 				// only if target point is setted
 				_att_sp.fw_control_yaw = true;
 
@@ -509,27 +494,7 @@ GroundRoverPositionControl::control_position(const matrix::Vector2f &current_pos
 
 				_att_sp.yaw_body = _nav_bearing;
 
-//			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
-				if (!_achieved
-				    && PX4_ISFINITE(pos_sp_triplet.current.yaw)
-				    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-//			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {   // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-					// pid calculate thrust.
-					_att_sp.thrust = mission_throttle;
-
-					_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
-
-				} else {
-					_att_sp.thrust = 0.05f;
-				}
-
-				if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
-					_att_sp.thrust = 0.0f;
-					_achieved = true;
-
-				} else {
-					_achieved = false;
-				}
+                check_achieved(pos_sp_triplet, mission_throttle);
 			}
 		}
 
@@ -654,9 +619,6 @@ GroundRoverPositionControl::task_main()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
-			/*			PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
-							 (double)_pos_sp_triplet.current.x,
-							 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);*/
 
 			if (control_position(current_position, ground_speed, _pos_sp_triplet)) {
 				_att_sp.timestamp = hrt_absolute_time();
@@ -814,4 +776,56 @@ int gnd_pos_control_main(int argc, char *argv[])
 
 	warnx("unrecognized command");
 	return 1;
+}
+
+float GroundRoverPositionControl::wrap_pi(float bearing)
+{
+	/* value is inf or NaN */
+
+	int c = 0;
+
+	while (bearing >= M_PI_F) {
+		bearing -= M_TWOPI_F;
+
+		if (c++ > 3) {
+			return NAN;
+		}
+	}
+
+	c = 0;
+
+	while (bearing < -M_PI_F) {
+		bearing += M_TWOPI_F;
+
+		if (c++ > 3) {
+			return NAN;
+		}
+	}
+
+	return bearing;
+}
+
+
+void GroundRoverPositionControl::check_achieved(const position_setpoint_triplet_s &pos_sp_triplet, float mission_throttle) {
+    //			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
+
+    Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
+    if (!_achieved
+        && PX4_ISFINITE(pos_sp_triplet.current.yaw)
+        && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {
+        _att_sp.thrust = mission_throttle;
+
+        _gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
+
+    } else {
+        _att_sp.thrust = 0.05f;
+    }
+
+    if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
+        _att_sp.thrust = 0.0f;
+        _achieved = true;
+
+    } else {
+        _achieved = false;
+    }
 }
