@@ -121,7 +121,7 @@ PARAM_DEFINE_FLOAT(GND_THR_CRUISE, 0.1f);
  * @increment 0.01
  * @group GND POS Control
  */
-PARAM_DEFINE_FLOAT(GND_THR_MAX, 0.3f);
+PARAM_DEFINE_FLOAT(GND_THR_MAX, 0.2f);
 
 /**
  * Throttle limit min
@@ -246,7 +246,7 @@ PARAM_DEFINE_FLOAT(GND_SPEED_THR_SC, 1.0f);
  * @increment 0.5
  * @group FW TECS
  */
-PARAM_DEFINE_FLOAT(GND_SPEED_TRIM, 3.0f);
+PARAM_DEFINE_FLOAT(GND_SPEED_TRIM, 1.0f);
 
 /**
  * Maximum ground speed
@@ -259,7 +259,7 @@ PARAM_DEFINE_FLOAT(GND_SPEED_TRIM, 3.0f);
  * @increment 0.5
  * @group FW TECS
  */
-PARAM_DEFINE_FLOAT(GND_SPEED_MAX, 10.0f);
+PARAM_DEFINE_FLOAT(GND_SPEED_MAX, 3.0f);
 
 /**
  * thrust in auto mode

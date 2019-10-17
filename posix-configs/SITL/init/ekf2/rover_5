@@ -29,7 +29,7 @@ param set GND_SPEED_P 0.25
 param set GND_SPEED_THR_SC 1
 param set GND_THR_CRUISE 0.3
 param set GND_THR_IDLE 0
-param set GND_THR_MAX 0.5
+param set GND_THR_MAX 0.3
 param set GND_THR_MIN 0
 param set GND_SPEED_TRIM 4
 param set GND_WR_D 1.2
@@ -51,6 +51,7 @@ param set SYS_MC_EST_GROUP 2
 param set SYS_RESTART_TYPE 2
 param set SITL_UDP_PRT 14565
 parm set GND_SPEED_TRIM 2.0
+param set COM_ARM_EKF_AB 0.01
 replay tryapplyparams
 simulator start -s
 tone_alarm start
