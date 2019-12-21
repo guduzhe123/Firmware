@@ -108,6 +108,7 @@
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/vehicle_status_flags.h>
 #include <uORB/topics/vtol_vehicle_status.h>
+#include <uORB/topics/debug_vect.h>
 #include <uORB/uORB.h>
 
 typedef enum VEHICLE_MODE_FLAG
@@ -187,6 +188,8 @@ static struct vehicle_land_detected_s land_detector = {};
 static float _eph_threshold_adj = INFINITY;	///< maximum allowable horizontal position uncertainty after adjustment for flight condition
 static bool _skip_pos_accuracy_check = false;
 
+static struct debug_vect_s _debug_vect = {};
+static orb_advert_t debug_pub = nullptr;
 /**
  * The daemon app only briefly exists to start
  * the background job. The stack size assigned in the
@@ -994,6 +997,20 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 				mavlink_log_critical(&mavlink_log_pub, "Precision landing denied, land manually");
 				cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED;
 			}
+		}
+		break;
+
+	case vehicle_command_s::VEHICLE_CMD_SET_MULTI_VEHICLE_FORMATION: {
+			_debug_vect.x = (float)cmd.param1 ;//
+			PX4_INFO("param1 =  %d", (int)cmd.param1);
+
+			if (debug_pub == nullptr) {
+				debug_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect);
+			} else {
+				orb_publish(ORB_ID(debug_vect), debug_pub, &_debug_vect);
+			}
+
+			cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
 		}
 		break;
 
