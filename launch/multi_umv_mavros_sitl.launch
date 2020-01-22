@@ -206,5 +206,5 @@
     </group>
 
 <!--    <include file="$(find uuv_tutorial_dp_controller)/launch/start_tutorial_dp_controller_demo.launch"/>-->
-    <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4.launch"/>
+    <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4_umv.launch"/>
 </launch>
