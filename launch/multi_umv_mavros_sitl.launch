@@ -207,4 +207,6 @@
 
 <!--    <include file="$(find uuv_tutorial_dp_controller)/launch/start_tutorial_dp_controller_demo.launch"/>-->
     <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4_umv.launch"/>
+
+    <include file="$(find offboard)/launch/multi_offboard.launch"/>
 </launch>
