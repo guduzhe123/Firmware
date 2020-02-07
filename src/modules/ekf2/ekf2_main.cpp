@@ -1406,7 +1406,7 @@ void Ekf2::run()
 							    || (fabsf(_hgt_innov_lpf) > _hgt_innov_test_lim);
 
 					// master pass-fail status
-					PX4_INFO("_preflt_horiz_fail = %d,  _preflt_vert_fail = %d",_preflt_horiz_fail, _preflt_vert_fail);
+//					PX4_INFO("_preflt_horiz_fail = %d,  _preflt_vert_fail = %d",_preflt_horiz_fail, _preflt_vert_fail);
 					_preflt_fail = _preflt_horiz_fail || _preflt_vert_fail;
 
 				} else {
