@@ -14,7 +14,7 @@ set(config_module_list
 	#drivers/bmp280
 	drivers/boards
 	#drivers/bst
-	drivers/camera_trigger
+	#drivers/camera_trigger
 	drivers/device
 	#drivers/ets_airspeed
 	drivers/frsky_telemetry
