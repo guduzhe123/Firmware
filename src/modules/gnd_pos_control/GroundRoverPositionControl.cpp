@@ -89,6 +89,7 @@ GroundRoverPositionControl::GroundRoverPositionControl() :
 
 	_parameter_handles.thrust_auto = param_find("GND_THRUST_AUTO");
 	_parameter_handles.acc_rad = param_find("GND_ACCPT_RAD");
+	_parameter_handles.slow_down_rad = param_find("GND_SLOW_RAD");
 
 	_parameter_handles.thrust_kp = param_find("GND_THRUST_KP");
 	_parameter_handles.thrust_ki = param_find("GND_THRUST_KI");
@@ -148,6 +149,7 @@ GroundRoverPositionControl::parameters_update()
 	param_get(_parameter_handles.throttle_cruise, &(_parameters.throttle_cruise));
 
 	param_get(_parameter_handles.acc_rad, &(_parameters.acc_rad));
+	param_get(_parameter_handles.slow_down_rad, &(_parameters.slow_down_rad));
 	param_get(_parameter_handles.thrust_auto, &(_parameters.thrust_auto));
 
 	param_get(_parameter_handles.thrust_kp, &(_parameters.thrust_kp));
@@ -210,6 +212,17 @@ GroundRoverPositionControl::position_setpoint_triplet_poll()
 	}
 }
 
+void
+GroundRoverPositionControl::vehicle_attitude_poll()
+{
+	bool updated;
+	orb_check(_att_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(vehicle_attitude), _att_sub, &_att);
+	}
+}
+
 void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 {
 	_gnd_pos_ctrl_status.timestamp = hrt_absolute_time();
@@ -266,6 +279,13 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			/* control the speed in closed loop */
 
 			float mission_target_speed = _parameters.gndspeed_trim;
+
+			if (_gnd_pos_ctrl_status.wp_dist < _parameters.slow_down_rad) {
+				mission_target_speed = 1;
+
+			} else if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad) {
+				mission_target_speed = 0;
+			}
 
 			if (PX4_ISFINITE(_pos_sp_triplet.current.cruising_speed) &&
 			    _pos_sp_triplet.current.cruising_speed > 0.1f) {
@@ -328,35 +348,35 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			// only if target point is setted
 			_att_sp.fw_control_yaw = true;
 
-			if (!_achieved && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
+			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
+				_att_sp.yaw_body = _nav_bearing;
+			}
+
+//			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
+			if (!_achieved
+			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
 				// pid calculate thrust.
-//				_att_sp.thrust = _parameters.thrust_kp * _gnd_pos_ctrl_status.wp_dist + _parameters.thrust_kd *
-//						 (_gnd_pos_ctrl_status.wp_dist - _gnd_pos_dist_pre) / dt
-//						 + _parameters.thrust_ki * (_gnd_pos_dist_i + _gnd_pos_ctrl_status.wp_dist * dt);
-////                _att_sp.thrust = pid_calculate(&_thrust_ctrl, );
-//				_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);
 				_att_sp.thrust = mission_throttle;
 
 				_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 			}
 
-			if (PX4_ISFINITE(pos_sp_triplet.current.yaw)) {
-				_att_sp.yaw_body = _nav_bearing;
-			}
+
+			PX4_INFO("euler_angles.psi() = %.2f, _att_sp.yaw_body = %.2f, fabsf(yaw - yaw_sp) = %.2f",
+				 (double)(euler_angles.psi() * 180.0f / 3.14f), (double)(_att_sp.yaw_body * 180.0f / 3.14f),
+				 (double)(fabsf(euler_angles.psi() - _att_sp.yaw_body) * 180.0f / 3.14f));
 
 			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
 
 			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
 				_att_sp.thrust = 0.0f;
 				_achieved = true;
+//				pos_sp_triplet.current.valid = false;
 
 			} else {
 				_achieved = false;
 			}
 
-			if (_achieved) {
-				_att_sp.thrust = 0.0f;
-			}
 
 //			PX4_INFO("_att_sp.thrust = %.2f, _att_sp.yaw_body = %.2f", (double)_att_sp.thrust, (double)_att_sp.yaw_body);
 		}
@@ -390,6 +410,7 @@ GroundRoverPositionControl::task_main()
 	_manual_control_sub = orb_subscribe(ORB_ID(manual_control_setpoint));
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
+	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
@@ -465,6 +486,7 @@ GroundRoverPositionControl::task_main()
 
 			manual_control_setpoint_poll();
 			position_setpoint_triplet_poll();
+			vehicle_attitude_poll();
 			_sub_attitude.update();
 			_sub_sensors.update();
 
@@ -475,6 +497,22 @@ GroundRoverPositionControl::task_main()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
+//			PX4_INFO("_achieved = %d", _achieved);
+//			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.2f", (double)_gnd_pos_ctrl_status.wp_dist);
+//			PX4_INFO("_pos_sp_triplet.next.valid = %d", _pos_sp_triplet.next.valid);
+
+//			bool next;
+//			if (_pos_sp_triplet.next.valid){
+//				next = true;
+//			} else {
+//				next = false;
+//			}
+//			PX4_INFO("next = %d", next);
+
+//			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && _pos_sp_triplet.current.valid){
+//				_pos_sp_triplet.current.valid = false;
+//			}
+
 			if (control_position(current_position, ground_speed, _pos_sp_triplet)) {
 				_att_sp.timestamp = hrt_absolute_time();
 

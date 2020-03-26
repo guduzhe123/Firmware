@@ -105,6 +105,7 @@ private:
 	int		_manual_control_sub{-1};		/**< notification of manual control updates */
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
+	int     _att_sub{-1};
 	float   _nav_bearing{};
 	float  _gnd_pos_dist_pre{};
 	float  _gnd_pos_dist_i{};
@@ -160,6 +161,7 @@ private:
 
 		float thrust_auto;
 		float acc_rad;
+		float slow_down_rad;
 
 		float thrust_kp;
 		float thrust_ki;
@@ -190,6 +192,7 @@ private:
 
 		param_t thrust_auto;
 		param_t acc_rad;
+		param_t slow_down_rad;
 
 		param_t thrust_kp;
 		param_t thrust_ki;
@@ -206,6 +209,7 @@ private:
 	void		manual_control_setpoint_poll();
 	void		position_setpoint_triplet_poll();
 	void		vehicle_control_mode_poll();
+	void		vehicle_attitude_poll();
 
 	/**
 	 * Publish navigation capabilities
