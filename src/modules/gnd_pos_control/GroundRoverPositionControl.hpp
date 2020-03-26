@@ -98,12 +98,14 @@ private:
 
 	bool		_task_should_exit{false};		/**< if true, sensor task should exit */
 	bool		_task_running{false};			/**< if true, task is running in its mainloop */
+	bool        _achieved{false};              /* true if vehicle achieved the target point*/
 
 	int		_control_mode_sub{-1};		/**< control mode subscription */
 	int		_global_pos_sub{-1};
 	int		_manual_control_sub{-1};		/**< notification of manual control updates */
 	int		_params_sub{-1};			/**< notification of parameter updates */
 	int		_pos_sp_triplet_sub{-1};
+	float   _nav_bearing{};
 
 	fw_pos_ctrl_status_s			_gnd_pos_ctrl_status{};		/**< navigation capabilities */
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
@@ -153,6 +155,9 @@ private:
 		float throttle_cruise;
 		float throttle_slew_max;
 
+		float thrust_auto;
+		float acc_rad;
+
 	} _parameters{};			/**< local copies of interesting parameters */
 
 	struct {
@@ -175,6 +180,9 @@ private:
 		param_t throttle_max;
 		param_t throttle_cruise;
 		param_t throttle_slew_max;
+
+		param_t thrust_auto;
+		param_t acc_rad;
 
 	} _parameter_handles{};		/**< handles for interesting parameters */
 

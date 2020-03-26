@@ -87,6 +87,9 @@ GroundRoverPositionControl::GroundRoverPositionControl() :
 	_parameter_handles.throttle_max = param_find("GND_THR_MAX");
 	_parameter_handles.throttle_cruise = param_find("GND_THR_CRUISE");
 
+	_parameter_handles.thrust_auto = param_find("GND_THRUST_AUTO");
+	_parameter_handles.acc_rad = param_find("GND_ACCPT_RAD");
+
 	/* fetch initial parameter values */
 	parameters_update();
 }
@@ -137,6 +140,9 @@ GroundRoverPositionControl::parameters_update()
 	param_get(_parameter_handles.throttle_min, &(_parameters.throttle_min));
 	param_get(_parameter_handles.throttle_max, &(_parameters.throttle_max));
 	param_get(_parameter_handles.throttle_cruise, &(_parameters.throttle_cruise));
+
+	param_get(_parameter_handles.acc_rad, &(_parameters.acc_rad));
+	param_get(_parameter_handles.thrust_auto, &(_parameters.thrust_auto));
 
 	_gnd_control.set_l1_damping(_parameters.l1_damping);
 	_gnd_control.set_l1_period(_parameters.l1_period);
@@ -237,6 +243,8 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			prev_wp(1) = (float)pos_sp_triplet.previous.lon;
 		}
 
+//        PX4_INFO("pos_sp_triplet.previous.yaw = %.2f, current.yaw = %.2f", (double)pos_sp_triplet.previous.yaw, (double)pos_sp_triplet.current.yaw);
+
 		math::Vector<2> ground_speed_2d = {ground_speed(0), ground_speed(1)};
 
 		float mission_throttle = _parameters.throttle_cruise;
@@ -283,6 +291,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 
 		} else if ((pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION)
 			   || (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF)) {
+			PX4_INFO("pos_sp_triplet.current.yaw = %.2f", (double)pos_sp_triplet.current.yaw);
 
 			/* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
 			_gnd_control.navigate_waypoints(prev_wp, curr_wp, current_position, ground_speed_2d);
@@ -293,7 +302,8 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			_att_sp.thrust = mission_throttle;
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-
+			PX4_INFO("_gnd_control.nav_bearing() = %.2f, pos_sp_triplet.current.yaw = %.2f, _nav_bearing = %.2f",
+				 (double)_gnd_control.nav_bearing(), (double)pos_sp_triplet.current.yaw, (double)_nav_bearing);
 			/* waypoint is a loiter waypoint so we want to stop*/
 			_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
 						     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
@@ -302,7 +312,28 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = _gnd_control.nav_bearing();
 			_att_sp.fw_control_yaw = true;
-			_att_sp.thrust = 0.0f;
+
+			if (!_achieved) {
+				// pid calculate thrust.
+				_att_sp.thrust = 0.01f * _gnd_pos_ctrl_status.wp_dist ;
+				_att_sp.thrust = math::constrain(_att_sp.thrust, 0.0f, 1.0f);
+			}
+
+			if (pos_sp_triplet.current.valid) {
+				_att_sp.yaw_body = _nav_bearing;
+			}
+
+			PX4_INFO("_gnd_pos_ctrl_status.wp_dist = %.4f", (double)_gnd_pos_ctrl_status.wp_dist);
+
+			if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
+				_att_sp.thrust = 0.0f;
+				_achieved = true;
+
+			} else {
+				_achieved = false;
+			}
+
+			PX4_INFO("_att_sp.thrust = %.2f", (double)_att_sp.thrust);
 		}
 
 		if (was_circle_mode && !_gnd_control.circle_mode()) {
@@ -463,6 +494,9 @@ GroundRoverPositionControl::task_main()
 					math::Vector<2> curr_wp((float)_pos_sp_triplet.current.lat, (float)_pos_sp_triplet.current.lon);
 					_gnd_pos_ctrl_status.wp_dist = get_distance_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 								       curr_wp(1));
+					_nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
+							curr_wp(1));
+
 
 					gnd_pos_ctrl_status_publish();
 				}
