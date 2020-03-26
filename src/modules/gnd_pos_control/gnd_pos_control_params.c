@@ -106,7 +106,7 @@ PARAM_DEFINE_FLOAT(GND_L1_DAMPING, 0.75f);
  * @increment 0.01
  * @group GND POS Control
  */
-PARAM_DEFINE_FLOAT(GND_THR_CRUISE, 0.1f);
+PARAM_DEFINE_FLOAT(GND_THR_CRUISE, 0.5f);
 
 /**
  * Throttle limit max
@@ -121,7 +121,7 @@ PARAM_DEFINE_FLOAT(GND_THR_CRUISE, 0.1f);
  * @increment 0.01
  * @group GND POS Control
  */
-PARAM_DEFINE_FLOAT(GND_THR_MAX, 0.3f);
+PARAM_DEFINE_FLOAT(GND_THR_MAX, 1.0f);
 
 /**
  * Throttle limit min
@@ -219,7 +219,7 @@ PARAM_DEFINE_FLOAT(GND_SPEED_D, 0.0f);
  * @increment 0.005
  * @group GND Attitude Control
  */
-PARAM_DEFINE_FLOAT(GND_SPEED_IMAX, 1.0f);
+PARAM_DEFINE_FLOAT(GND_SPEED_IMAX, 5.0f);
 
 /**
  * Speed to throttle scaler
@@ -233,7 +233,7 @@ PARAM_DEFINE_FLOAT(GND_SPEED_IMAX, 1.0f);
  * @increment 0.005
  * @group GND Attitude Control
  */
-PARAM_DEFINE_FLOAT(GND_SPEED_THR_SC, 1.0f);
+PARAM_DEFINE_FLOAT(GND_SPEED_THR_SC, 2.0f);
 
 /**
  * Trim ground speed
@@ -246,7 +246,7 @@ PARAM_DEFINE_FLOAT(GND_SPEED_THR_SC, 1.0f);
  * @increment 0.5
  * @group FW TECS
  */
-PARAM_DEFINE_FLOAT(GND_SPEED_TRIM, 3.0f);
+PARAM_DEFINE_FLOAT(GND_SPEED_TRIM, 6.0f);
 
 /**
  * Maximum ground speed
@@ -313,7 +313,7 @@ PARAM_DEFINE_FLOAT(GND_SLOW_SPEED, 0.5f);
  * @max 100
  * @group GND TECS
  */
-PARAM_DEFINE_FLOAT(GND_THRUST_KP, 0.01f);
+PARAM_DEFINE_FLOAT(GND_THRUST_KP, 0.04f);
 
 /**
  * accept radium to stop thrust

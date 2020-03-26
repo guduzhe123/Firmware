@@ -8,7 +8,7 @@ set(config_module_list
 	# Board support modules
 	#
 	#drivers/adis16448
-	#drivers/airspeed
+	drivers/airspeed
 	#drivers/blinkm
 	#drivers/bmi160
 	#drivers/bmp280
@@ -126,7 +126,7 @@ set(config_module_list
 	modules/gnd_pos_control
 	modules/mc_att_control
 	modules/mc_pos_control
-	modules/vtol_att_control
+	#modules/vtol_att_control
 
 	#
 	# Logging

@@ -475,16 +475,16 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			// TODO change mavlink receiver commmand namek
 
 			/* waypoint is a loiter waypoint so we want to stop*/
-			PX4_INFO("_pos_sp_triplet.timestamp = %d, hrt_absolute_time() = %d, err = %d", pos_sp_triplet.timestamp,
-				 hrt_absolute_time(), (hrt_absolute_time() - pos_sp_triplet.timestamp));
+/*			PX4_INFO("_pos_sp_triplet.timestamp = %d, hrt_absolute_time() = %d, err = %d", pos_sp_triplet.timestamp,
+				 hrt_absolute_time(), (hrt_absolute_time() - pos_sp_triplet.timestamp));*/
 
 			if (hrt_absolute_time() - pos_sp_triplet.timestamp < 3e+6) { // less than 3 secs
 				control_offboard(dt, ground_speed, pos_sp_triplet);
 
 			} else {
 				/* previous waypoint */
-				PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
-				PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));
+/*				PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
+				PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));*/
 
 				// TODO need to know the target of the whole mission. 任务目标经纬度
 				curr_wp(0) = _pos_sp_copy.current.lat;
@@ -509,15 +509,12 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 //			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
 				if (!_achieved
 				    && PX4_ISFINITE(pos_sp_triplet.current.yaw)
-				    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {  // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-//			    && PX4_ISFINITE(pos_sp_triplet.current.yaw)) {   // if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523
-					// pid calculate thrust.
+				    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {
 					_att_sp.thrust = mission_throttle;
-
 					_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 
 				} else {
-					_att_sp.thrust = 0.05f;
+					_att_sp.thrust = 0.1f;
 				}
 
 				if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
