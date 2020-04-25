@@ -235,8 +235,18 @@ private:
 	bool		control_position(const matrix::Vector2f &global_pos, const matrix::Vector3f &ground_speed,
 					 const position_setpoint_triplet_s &_pos_sp_triplet);
 
-	void        control_offboard(float dt, const matrix::Vector3f &ground_speed,
-				     const position_setpoint_triplet_s &pos_sp_triplet, const matrix::Vector2f &current_position);
+	void        control_hold(const math::Vector<2> &current_position,
+                             const math::Vector<3> &ground_speed,
+                             const position_setpoint_triplet_s &pos_sp_triplet,
+                             const float mission_throttle);
+
+	void        control_mission(const math::Vector<2> &current_position,
+                             const math::Vector<3> &ground_speed,
+                             const position_setpoint_triplet_s &pos_sp_triplet,
+                             const float mission_throttle);
+
+	void        control_offboard(float dt, const math::Vector<3> &ground_speed,
+				     const position_setpoint_triplet_s &pos_sp_triplet);
 
 	/**
 	 * Shim for calling task_main from task_create.
@@ -247,9 +257,5 @@ private:
 	 * Main sensor collection task.
 	 */
 	void		task_main();
-
-    float wrap_pi(float bearing);
-
-    void check_achieved(const position_setpoint_triplet_s &pos_sp_triplet, float mission_throttle);
 
 };

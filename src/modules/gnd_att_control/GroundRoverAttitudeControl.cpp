@@ -126,7 +126,7 @@ GroundRoverAttitudeControl::parameters_update()
 			   _parameters.w_i,
 			   _parameters.w_d,
 			   _parameters.w_imax,
-			   1.0f);
+			   0.6f);
 }
 
 void
