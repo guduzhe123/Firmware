@@ -2008,7 +2008,7 @@ Mavlink::task_main(int argc, char *argv[])
 	if (_mode != MAVLINK_MODE_IRIDIUM) {
 
 		/* HEARTBEAT is constant rate stream, rate never adjusted */
-		configure_stream("HEARTBEAT", 1.0f);
+		configure_stream("HEARTBEAT", 5.0f);
 
 		/* STATUSTEXT stream is like normal stream but gets messages from logbuffer instead of uORB */
 		configure_stream("STATUSTEXT", 20.0f);
@@ -2050,14 +2050,14 @@ Mavlink::task_main(int argc, char *argv[])
 		break;
 
 	case MAVLINK_MODE_ONBOARD:
-		configure_stream("SYS_STATUS", 5.0f);
+		configure_stream("SYS_STATUS", 1.0f);
 		configure_stream("EXTENDED_SYS_STATE", 5.0f);
 		configure_stream("HIGHRES_IMU", 50.0f);
-		configure_stream("ATTITUDE", 100.0f);
-		configure_stream("ATTITUDE_QUATERNION", 50.0f);
-		configure_stream("RC_CHANNELS", 20.0f);
-		configure_stream("SERVO_OUTPUT_RAW_0", 10.0f);
-		configure_stream("ALTITUDE", 10.0f);
+		configure_stream("ATTITUDE", 20.0f);
+//		configure_stream("ATTITUDE_QUATERNION", 10.0f);
+		configure_stream("RC_CHANNELS", 5.0f);
+		configure_stream("SERVO_OUTPUT_RAW_0", 1.0f);
+		configure_stream("ALTITUDE", 1.0f);
 		configure_stream("GPS_RAW_INT");
 		configure_stream("ADSB_VEHICLE");
 		configure_stream("COLLISION");
@@ -2066,7 +2066,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("VISION_POSITION_ESTIMATE", 10.0f);
 		configure_stream("ESTIMATOR_STATUS", 1.0f);
 		configure_stream("NAV_CONTROLLER_OUTPUT", 10.0f);
-		configure_stream("GLOBAL_POSITION_INT", 50.0f);
+		configure_stream("GLOBAL_POSITION_INT", 30.0f);
 		configure_stream("LOCAL_POSITION_NED", 30.0f);
 		configure_stream("POSITION_TARGET_GLOBAL_INT", 10.0f);
 		configure_stream("ATTITUDE_TARGET", 10.0f);
@@ -2082,7 +2082,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("CAMERA_CAPTURE", 2.0f);
 		configure_stream("CAMERA_TRIGGER");
 		configure_stream("CAMERA_IMAGE_CAPTURED");
-		configure_stream("ACTUATOR_CONTROL_TARGET0", 10.0f);
+		configure_stream("ACTUATOR_CONTROL_TARGET0", 1.0f);
 		break;
 
 	case MAVLINK_MODE_OSD:
@@ -2112,7 +2112,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("EXTENDED_SYS_STATE", 2.0f);
 		configure_stream("HIGHRES_IMU", 50.0f);
 		configure_stream("ATTITUDE", 50.0f);
-		configure_stream("ATTITUDE_QUATERNION", 50.0f);
+//		configure_stream("ATTITUDE_QUATERNION", 50.0f);
 		configure_stream("RC_CHANNELS", 10.0f);
 		configure_stream("SERVO_OUTPUT_RAW_0", 20.0f);
 		configure_stream("SERVO_OUTPUT_RAW_1", 20.0f);

@@ -233,7 +233,7 @@ static bool magConsistencyCheck(orb_advert_t *mavlink_log_pub, bool report_statu
 		if (report_status) {
 			mavlink_log_critical(mavlink_log_pub, "PREFLIGHT FAIL: MAG SENSORS INCONSISTENT");
 		}
-		return false;
+//		return false;
 	}
 
 	return true;

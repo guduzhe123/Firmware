@@ -235,6 +235,16 @@ private:
 	bool		control_position(const math::Vector<2> &global_pos, const math::Vector<3> &ground_speed,
 					 const position_setpoint_triplet_s &_pos_sp_triplet);
 
+	void        control_hold(const math::Vector<2> &current_position,
+                             const math::Vector<3> &ground_speed,
+                             const position_setpoint_triplet_s &pos_sp_triplet,
+                             const float mission_throttle);
+
+	void        control_mission(const math::Vector<2> &current_position,
+                             const math::Vector<3> &ground_speed,
+                             const position_setpoint_triplet_s &pos_sp_triplet,
+                             const float mission_throttle);
+
 	void        control_offboard(float dt, const math::Vector<3> &ground_speed,
 				     const position_setpoint_triplet_s &pos_sp_triplet);
 

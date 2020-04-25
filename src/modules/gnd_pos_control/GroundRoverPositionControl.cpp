@@ -353,6 +353,62 @@ GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &gr
 	}
 }
 
+void GroundRoverPositionControl::control_hold(const math::Vector<2> &current_position,
+                                              const math::Vector<3> &ground_speed,
+                                              const position_setpoint_triplet_s &pos_sp_triplet,
+                                              const float mission_throttle) {
+    /* previous waypoint */
+    math::Vector<2> curr_wp((float)pos_sp_triplet.current.lat, (float)pos_sp_triplet.current.lon);
+    /* previous waypoint */
+    math::Vector<2> ground_speed_2d = {ground_speed(0), ground_speed(1)};
+
+    PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
+    PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));
+
+    // TODO need to know the target of the whole mission. 任务目标经纬度
+    curr_wp(0) = _pos_sp_copy.current.lat;
+    curr_wp(1) = _pos_sp_copy.current.lon;
+
+    _gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
+                                 pos_sp_triplet.current.loiter_direction, ground_speed_2d);
+
+    Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
+    _att_sp.roll_body = _gnd_control.nav_roll();
+    _att_sp.pitch_body = 0.0f;
+
+    _att_sp.fw_control_yaw = false;
+    if (_gnd_pos_ctrl_status.wp_dist > _parameters.acc_rad){
+        // only if target point is setted
+        _nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
+                                                    curr_wp(1));
+        _att_sp.yaw_body = _nav_bearing;
+    } else {
+        // needs actual att now. so actuators don't move when change hold mode
+        _att_sp.yaw_body = euler_angles.psi();
+    }
+
+    if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
+        _att_sp.thrust = 0.0f;
+    } else {
+        _att_sp.thrust = mission_throttle;
+    }
+    PX4_INFO("_att_sp.yaw_body = %.2f, fw_pos_ctrl_status_s.wp_dist = %.2f, _att_sp.thrust = %.2f",
+             (double)_att_sp.yaw_body, (double)_gnd_pos_ctrl_status.wp_dist, (double)_att_sp.thrust);
+}
+
+void GroundRoverPositionControl::control_mission(const math::Vector<2> &current_position,
+                                                 const math::Vector<3> &ground_speed,
+                                                 const position_setpoint_triplet_s &pos_sp_triplet,
+                                                 const float mission_throttle) {
+    PX4_INFO("mission control");
+    /* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
+    _att_sp.roll_body = 0.0f;
+    _att_sp.pitch_body = 0.0f;
+    _att_sp.yaw_body = _nav_bearing;
+    _att_sp.fw_control_yaw = true;
+    _att_sp.thrust = mission_throttle;
+}
+
 bool
 GroundRoverPositionControl::control_position(const math::Vector<2> &current_position,
 		const math::Vector<3> &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
@@ -362,21 +418,12 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 	if (_control_position_last_called > 0) {
 		dt = hrt_elapsed_time(&_control_position_last_called) * 1e-6f;
 	}
-
 	_control_position_last_called = hrt_absolute_time();
-
 	bool setpoint = true;
-
 	if (_control_mode.flag_control_offboard_enabled) {
-		//	 offboard control
-//		PX4_INFO("_pos_sp_triplet.current.vx = %.2f", (double)_pos_sp_triplet.current.vx);
-
 		control_offboard(dt, ground_speed, pos_sp_triplet);
-	}
 
-	else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
-//        PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
-//                 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
+	} else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
 		/* AUTONOMOUS FLIGHT */
 
 		_control_mode_current = UGV_POSCTRL_MODE_AUTO;
@@ -396,8 +443,6 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 		}
 
 //        PX4_INFO("pos_sp_triplet.previous.yaw = %.2f, current.yaw = %.2f", (double)pos_sp_triplet.previous.yaw, (double)pos_sp_triplet.current.yaw);
-
-		math::Vector<2> ground_speed_2d = {ground_speed(0), ground_speed(1)};
 
 		float mission_throttle = _parameters.throttle_cruise;
 
@@ -451,79 +496,17 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 		} else if ((pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION)
 			   || (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF)) {
 
-			/* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
-			_gnd_control.navigate_waypoints(prev_wp, curr_wp, current_position, ground_speed_2d);
-			_att_sp.roll_body = _gnd_control.nav_roll();
-			_att_sp.pitch_body = 0.0f;
-//			_att_sp.yaw_body = _gnd_control.nav_bearing();
-			_att_sp.yaw_body = _nav_bearing;
-
-			_att_sp.fw_control_yaw = true;
-//			_att_sp.thrust = mission_throttle;
-
-			Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
-
-			if (fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {
-				_att_sp.thrust = mission_throttle;
-
-			} else {
-				_att_sp.thrust = 0.05f;
-			}
+            control_mission(current_position, ground_speed, pos_sp_triplet, mission_throttle);
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
-
-			// TODO change mavlink receiver commmand namek
-
-			/* waypoint is a loiter waypoint so we want to stop*/
-/*			PX4_INFO("_pos_sp_triplet.timestamp = %d, hrt_absolute_time() = %d, err = %d", pos_sp_triplet.timestamp,
-				 hrt_absolute_time(), (hrt_absolute_time() - pos_sp_triplet.timestamp));*/
+            // hold mode
+			// TODO change mavlink receiver commmand name
 
 			if (hrt_absolute_time() - pos_sp_triplet.timestamp < 3e+6) { // less than 3 secs
 				control_offboard(dt, ground_speed, pos_sp_triplet);
 
 			} else {
-				/* previous waypoint */
-/*				PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
-				PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));*/
-
-				// TODO need to know the target of the whole mission. 任务目标经纬度
-				curr_wp(0) = _pos_sp_copy.current.lat;
-				curr_wp(1) = _pos_sp_copy.current.lon;
-
-				_gnd_control.navigate_loiter(curr_wp, current_position, pos_sp_triplet.current.loiter_radius,
-							     pos_sp_triplet.current.loiter_direction, ground_speed_2d);
-
-				Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
-				_att_sp.roll_body = _gnd_control.nav_roll();
-				_att_sp.pitch_body = 0.0f;
-				_att_sp.yaw_body = euler_angles.psi(); // needs actual att now. so actuators don't move when change hold mode
-				// only if target point is setted
-				_att_sp.fw_control_yaw = true;
-
-
-				_nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
-						curr_wp(1));
-
-				_att_sp.yaw_body = _nav_bearing;
-
-//			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
-				if (!_achieved
-				    && PX4_ISFINITE(pos_sp_triplet.current.yaw)
-				    && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.1744f) {
-					_att_sp.thrust = mission_throttle;
-					_gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
-
-				} else {
-					_att_sp.thrust = 0.1f;
-				}
-
-				if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
-					_att_sp.thrust = 0.0f;
-					_achieved = true;
-
-				} else {
-					_achieved = false;
-				}
+                control_hold(current_position, ground_speed, pos_sp_triplet, mission_throttle);
 			}
 		}
 
