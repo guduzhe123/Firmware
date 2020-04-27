@@ -65,7 +65,9 @@ typedef enum PID_MODE {
 	 * setpoint derivative will be ignored, val_dot in pid_calculate() will be ignored */
 	PID_MODE_DERIVATIV_CALC_NO_SP,
 	/* Use PID_MODE_DERIVATIV_SET if you have the derivative already (Gyros, Kalman) */
-	PID_MODE_DERIVATIV_SET
+	PID_MODE_DERIVATIV_SET,
+
+    PID_MODE_LOCAL_Y_compensation
 } pid_mode_t;
 
 typedef struct {

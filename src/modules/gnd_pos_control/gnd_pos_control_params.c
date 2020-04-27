@@ -106,7 +106,7 @@ PARAM_DEFINE_FLOAT(GND_L1_DAMPING, 0.75f);
  * @increment 0.01
  * @group GND POS Control
  */
-PARAM_DEFINE_FLOAT(GND_THR_CRUISE, 0.1f);
+PARAM_DEFINE_FLOAT(GND_THR_CRUISE, 0.3f);
 
 /**
  * Throttle limit max
@@ -336,3 +336,73 @@ PARAM_DEFINE_FLOAT(GND_THRUST_KI, 0.01f);
  * @group GND TECS
  */
 PARAM_DEFINE_FLOAT(GND_THRUST_KD, 0.01f);
+
+/**
+ * Speed proportional gain
+ *
+ * This is the proportional gain for the speed closed loop controller
+ *
+ * @unit %m/s
+ * @min 0.005
+ * @max 50.0
+ * @decimal 3
+ * @increment 0.005
+ * @group GND Attitude Control
+ */
+PARAM_DEFINE_FLOAT(GND_LOCALY_P, 0.174f); // 3.14 / 18;
+
+/**
+ * Speed Integral gain
+ *
+ * This is the integral gain for the speed closed loop controller
+ *
+ * @unit %m/s
+ * @min 0.00
+ * @max 50.0
+ * @decimal 3
+ * @increment 0.005
+ * @group GND Attitude Control
+ */
+PARAM_DEFINE_FLOAT(GND_LOCALY_I, 0.01f);
+
+/**
+ * Speed proportional gain
+ *
+ * This is the derivative gain for the speed closed loop controller
+ *
+ * @unit %m/s
+ * @min 0.00
+ * @max 50.0
+ * @decimal 3
+ * @increment 0.005
+ * @group GND Attitude Control
+ */
+PARAM_DEFINE_FLOAT(GND_LOCALY_D, 0.0f);
+
+/**
+ * Speed integral maximum value
+ *
+ * This is the maxim value the integral can reach to prevent wind-up.
+ *
+ * @unit %m/s
+ * @min 0.005
+ * @max 50.0
+ * @decimal 3
+ * @increment 0.005
+ * @group GND Attitude Control
+ */
+PARAM_DEFINE_FLOAT(GND_LOCALY_IMAX, 1.0f);
+
+/**
+ * Speed integral maximum value
+ *
+ * This is the maxim value the integral can reach to prevent wind-up.
+ *
+ * @unit %m/s
+ * @min 0.005
+ * @max 50.0
+ * @decimal 3
+ * @increment 0.005
+ * @group GND Attitude Control
+ */
+PARAM_DEFINE_FLOAT(GND_LOCALY_MAX, 1.0f);
