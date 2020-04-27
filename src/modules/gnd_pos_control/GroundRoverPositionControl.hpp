@@ -138,6 +138,8 @@ private:
 	 the throttle. For now just assuming a proportional scaler between controlled airspeed and throttle output.*/
 	PID_t _speed_ctrl{};
 
+	PID_t _local_y_ctrl{};
+
 	// estimator reset counters
 	uint8_t _pos_reset_counter{0};		// captures the number of times the estimator has reset the horizontal position
 
@@ -162,6 +164,12 @@ private:
 		float speed_d;
 		float speed_imax;
 		float throttle_speed_scaler;
+
+        float localy_p;
+        float localy_i;
+        float localy_d;
+        float localy_imax;
+        float localy_max;
 
 		float throttle_min;
 		float throttle_max;
@@ -194,6 +202,12 @@ private:
 		param_t speed_d;
 		param_t speed_imax;
 		param_t throttle_speed_scaler;
+
+        param_t localy_p;
+        param_t localy_i;
+        param_t localy_d;
+        param_t localy_imax;
+        param_t localy_max;
 
 		param_t throttle_min;
 		param_t throttle_max;
@@ -247,6 +261,9 @@ private:
 
 	void        control_offboard(float dt, const math::Vector<3> &ground_speed,
 				     const position_setpoint_triplet_s &pos_sp_triplet);
+
+	void        local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
+                                     double lat_start, double lon_start, double lat_end, double lon_end);
 
 	/**
 	 * Shim for calling task_main from task_create.

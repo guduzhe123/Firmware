@@ -83,6 +83,12 @@ GroundRoverPositionControl::GroundRoverPositionControl() :
 	_parameter_handles.speed_imax = param_find("GND_SPEED_IMAX");
 	_parameter_handles.throttle_speed_scaler = param_find("GND_SPEED_THR_SC");
 
+    _parameter_handles.localy_p = param_find("GND_LOCALY_P");
+    _parameter_handles.localy_i = param_find("GND_LOCALY_I");
+    _parameter_handles.localy_d = param_find("GND_LOCALY_D");
+    _parameter_handles.localy_imax = param_find("GND_LOCALY_IMAX");
+    _parameter_handles.localy_max = param_find("GND_LOCALY_MAX");
+
 	_parameter_handles.throttle_min = param_find("GND_THR_MIN");
 	_parameter_handles.throttle_max = param_find("GND_THR_MAX");
 	_parameter_handles.throttle_cruise = param_find("GND_THR_CRUISE");
@@ -145,6 +151,12 @@ GroundRoverPositionControl::parameters_update()
 	param_get(_parameter_handles.speed_imax, &(_parameters.speed_imax));
 	param_get(_parameter_handles.throttle_speed_scaler, &(_parameters.throttle_speed_scaler));
 
+    param_get(_parameter_handles.localy_p, &(_parameters.localy_p));
+    param_get(_parameter_handles.localy_i, &(_parameters.localy_i));
+    param_get(_parameter_handles.localy_d, &(_parameters.localy_d));
+    param_get(_parameter_handles.localy_imax, &(_parameters.localy_imax));
+    param_get(_parameter_handles.localy_max, &(_parameters.localy_max));
+
 	param_get(_parameter_handles.throttle_min, &(_parameters.throttle_min));
 	param_get(_parameter_handles.throttle_max, &(_parameters.throttle_max));
 	param_get(_parameter_handles.throttle_cruise, &(_parameters.throttle_cruise));
@@ -171,6 +183,14 @@ GroundRoverPositionControl::parameters_update()
 			   _parameters.speed_i,
 			   _parameters.speed_imax,
 			   _parameters.gndspeed_max);
+
+	pid_init(&_local_y_ctrl, PID_MODE_LOCAL_Y_compensation, 0.01f);
+	pid_set_parameters(&_local_y_ctrl,
+			   _parameters.localy_p,
+			   _parameters.localy_d,
+			   _parameters.localy_i,
+			   _parameters.localy_imax,
+			   _parameters.localy_max);
 
 	/* Update and publish the navigation capabilities */
 	_gnd_pos_ctrl_status.landing_slope_angle_rad = 0;
@@ -288,8 +308,7 @@ GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &gr
 {
 	if (_pos_sp_triplet.current.valid) {
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
-			/* float mission_throttle;
-			 float pos_err;*/
+
 			// turn yaw first, then control position.
 			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
@@ -394,6 +413,12 @@ void GroundRoverPositionControl::control_hold(const math::Vector<2> &current_pos
     }
     PX4_INFO("_att_sp.yaw_body = %.2f, fw_pos_ctrl_status_s.wp_dist = %.2f, _att_sp.thrust = %.2f",
              (double)_att_sp.yaw_body, (double)_gnd_pos_ctrl_status.wp_dist, (double)_att_sp.thrust);
+
+
+    struct crosstrack_error_s crosstrackErrorS;
+    local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_copy.previous.lat, _pos_sp_copy.previous.lon,
+                         _pos_sp_copy.current.lat, _pos_sp_copy.current.lon);
+    _att_sp.yaw_body -= crosstrackErrorS.distance;
 }
 
 void GroundRoverPositionControl::control_mission(const math::Vector<2> &current_position,
@@ -402,11 +427,38 @@ void GroundRoverPositionControl::control_mission(const math::Vector<2> &current_
                                                  const float mission_throttle) {
     PX4_INFO("mission control");
     /* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
+    math::Vector<2> curr_wp;
+    curr_wp(0) = _pos_sp_copy.current.lat;
+    curr_wp(1) = _pos_sp_copy.current.lon;
+
     _att_sp.roll_body = 0.0f;
     _att_sp.pitch_body = 0.0f;
+    _nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
+                                                curr_wp(1));
+    struct crosstrack_error_s crosstrackErrorS;
+    local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_copy.previous.lat, _pos_sp_copy.previous.lon,
+            _pos_sp_copy.current.lat, _pos_sp_copy.current.lon);
+
     _att_sp.yaw_body = _nav_bearing;
     _att_sp.fw_control_yaw = true;
     _att_sp.thrust = mission_throttle;
+
+    _att_sp.yaw_body -= crosstrackErrorS.distance;
+}
+
+void GroundRoverPositionControl::local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
+                                                      double lat_start, double lon_start, double lat_end, double lon_end) {
+    PX4_INFO("pre lat = %.6f, pre lon = %.6f, cur lat = %.6f, cur lon = %.6f, lat_end = %.6f, lon_end = %.6f",
+            lat_start, lon_start, lat_now, lon_now, lat_end, lon_end);
+    if (!get_distance_to_line(crosstrack_error, lat_now, lon_now, lat_start, lon_start, lat_end, lon_end)) {
+        PX4_INFO("cross tarck err = %.2f", (double)crosstrack_error->distance);
+    }
+
+    float dt = 0.01;
+    float y_compensation = pid_calculate(&_local_y_ctrl, crosstrack_error->distance, 0, 0, dt);
+
+    y_compensation = math::constrain(y_compensation, -_parameters.localy_max, _parameters.localy_max);
+    crosstrack_error->distance = y_compensation;
 }
 
 bool
@@ -486,6 +538,8 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				mission_throttle = _pos_sp_triplet.current.cruising_throttle;
 			}
 		}
+
+
 
 		if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
 			_att_sp.roll_body = 0.0f;
@@ -627,11 +681,13 @@ GroundRoverPositionControl::task_main()
 			math::Vector<3> ground_speed(_global_pos.vel_n, _global_pos.vel_e,  _global_pos.vel_d);
 			math::Vector<2> current_position((float)_global_pos.lat, (float)_global_pos.lon);
 
+/*            local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
+            double lat_start, double lon_start, double lat_end, double lon_end);*/
 			/*
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
-			/*			PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
+/*						PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
 							 (double)_pos_sp_triplet.current.x,
 							 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);*/
 
@@ -678,6 +734,8 @@ GroundRoverPositionControl::task_main()
 					math::Vector<2> curr_wp((float)_pos_sp_triplet.current.lat, (float)_pos_sp_triplet.current.lon);
 					_gnd_pos_ctrl_status.wp_dist = get_distance_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 								       curr_wp(1));
+
+					// TODO add y distance to yaw control.
 					_nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 							curr_wp(1));
 
