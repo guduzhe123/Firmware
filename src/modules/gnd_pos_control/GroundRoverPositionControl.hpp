@@ -262,6 +262,8 @@ private:
 	void        control_offboard(float dt, const matrix::Vector3f &ground_speed,
 				     const position_setpoint_triplet_s &pos_sp_triplet);
 
+	void        offboard_local_sp();
+
 	void        local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
                                      double lat_start, double lon_start, double lat_end, double lon_end);
 

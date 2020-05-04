@@ -340,8 +340,6 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 
 			_att_sp.thrust = mission_throttle;
 
-//            check_achieved(pos_sp_triplet, mission_throttle);
-//            PX4_INFO("thrust = %.2f", (double)_att_sp.thrust);
 
 		} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
 			float mission_throttle;
@@ -378,7 +376,6 @@ void GroundRoverPositionControl::control_hold(const matrix::Vector2f &current_po
                                               const float mission_throttle) {
     /* previous waypoint */
     matrix::Vector2f curr_wp((float)pos_sp_triplet.current.lat, (float)pos_sp_triplet.current.lon);
-    /* previous waypoint */
     matrix::Vector2f ground_speed_2d = {ground_speed(0), ground_speed(1)};
 
     PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
