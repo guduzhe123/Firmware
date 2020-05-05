@@ -122,6 +122,7 @@
 #include <uORB/topics/vehicle_status_flags.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/estimator_status.h>
+#include <uORB/topics/debug_vect.h>
 
 typedef enum VEHICLE_MODE_FLAG
 {
@@ -260,6 +261,9 @@ static bool _last_condition_global_position_valid = false;
 static struct vehicle_land_detected_s land_detector = {};
 
 static orb_advert_t _to_safety = nullptr;
+
+static struct debug_vect_s _debug_vect = {};
+static orb_advert_t debug_pub = nullptr;
 /**
  * The daemon app only briefly exists to start
  * the background job. The stack size assigned in the
@@ -1190,6 +1194,20 @@ bool handle_command(struct vehicle_status_s *status_local, const struct safety_s
 			}
 		}
 		break;
+
+        case vehicle_command_s::VEHICLE_CMD_SET_MULTI_VEHICLE_FORMATION: {
+            _debug_vect.x = (float)cmd->param1 ;//
+            PX4_INFO("param1 =  %d", (int)cmd->param1);
+
+            if (debug_pub == nullptr) {
+                debug_pub = orb_advertise(ORB_ID(debug_vect), &_debug_vect);
+            } else {
+                orb_publish(ORB_ID(debug_vect), debug_pub, &_debug_vect);
+            }
+
+            cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+        }
+            break;
 
 	case vehicle_command_s::VEHICLE_CMD_NAV_LAND: {
 			if (TRANSITION_CHANGED == main_state_transition(&status, commander_state_s::MAIN_STATE_AUTO_LAND, main_state_prev, &status_flags, &internal_state)) {

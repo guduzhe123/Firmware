@@ -60,6 +60,7 @@ uint16 VEHICLE_CMD_MISSION_START = 300			# start running a mission |first_item: 
 uint16 VEHICLE_CMD_COMPONENT_ARM_DISARM = 400		# Arms / Disarms a component |1 to arm, 0 to disarm|
 uint16 VEHICLE_CMD_START_RX_PAIR = 500			# Starts receiver pairing |0:Spektrum| 0:Spektrum DSM2, 1:Spektrum DSMX|
 uint16 VEHICLE_CMD_SET_CAMERA_MODE = 530            # Set camera capture mode (photo, video, etc.)
+uint16 VEHICLE_CMD_SET_MULTI_VEHICLE_FORMATION = 600            # Set multi vehicle team formation (square, triangle, etc)
 uint16 VEHICLE_CMD_MAVROS_START = 702        # Start offboard mode from px4 to companion computer though mavros
 uint16 VEHICLE_CMD_PRESS_SAFETY_ON = 703        # Enable or disable safety switch
 uint16 VEHICLE_CMD_DO_TRIGGER_CONTROL = 2003            # Enable or disable on-board camera triggering system
