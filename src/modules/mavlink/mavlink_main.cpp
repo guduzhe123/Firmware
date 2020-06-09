@@ -2008,7 +2008,7 @@ Mavlink::task_main(int argc, char *argv[])
 	if (_mode != MAVLINK_MODE_IRIDIUM) {
 
 		/* HEARTBEAT is constant rate stream, rate never adjusted */
-		configure_stream("HEARTBEAT", 5.0f);
+		configure_stream("HEARTBEAT", 1.0f);
 
 		/* STATUSTEXT stream is like normal stream but gets messages from logbuffer instead of uORB */
 		configure_stream("STATUSTEXT", 20.0f);
@@ -2022,12 +2022,12 @@ Mavlink::task_main(int argc, char *argv[])
 	case MAVLINK_MODE_NORMAL:
 		configure_stream("SYS_STATUS", 1.0f);
 		configure_stream("EXTENDED_SYS_STATE", 1.0f);
-		configure_stream("HIGHRES_IMU", 1.5f);
+		configure_stream("HIGHRES_IMU", 10.0f);
 		configure_stream("ATTITUDE", 20.0f);
 		configure_stream("RC_CHANNELS", 5.0f);
 		configure_stream("SERVO_OUTPUT_RAW_0", 1.0f);
 		configure_stream("ALTITUDE", 1.0f);
-		configure_stream("GPS_RAW_INT", 1.0f);
+		configure_stream("GPS_RAW_INT", 5.0f);
 		configure_stream("ADSB_VEHICLE");
 		configure_stream("COLLISION");
 		configure_stream("DISTANCE_SENSOR", 0.5f);
@@ -2036,17 +2036,18 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("ESTIMATOR_STATUS", 0.5f);
 		configure_stream("NAV_CONTROLLER_OUTPUT", 1.5f);
 		configure_stream("GLOBAL_POSITION_INT", 5.0f);
-		configure_stream("LOCAL_POSITION_NED", 1.0f);
-		configure_stream("POSITION_TARGET_LOCAL_NED", 1.5f);
+		configure_stream("LOCAL_POSITION_NED", 20.0f);
+		configure_stream("POSITION_TARGET_LOCAL_NED", 5.0f);
 		configure_stream("POSITION_TARGET_GLOBAL_INT", 1.5f);
-		configure_stream("ATTITUDE_TARGET", 2.0f);
+		configure_stream("ATTITUDE_TARGET", 5.0f);
 		configure_stream("HOME_POSITION", 0.5f);
 		configure_stream("NAMED_VALUE_FLOAT", 1.0f);
 		configure_stream("DEBUG", 1.0f);
 		configure_stream("DEBUG_VECT", 1.0f);
-		configure_stream("VFR_HUD", 4.0f);
+		configure_stream("VFR_HUD", 2.0f);
 		configure_stream("WIND_COV", 1.0f);
 		configure_stream("CAMERA_IMAGE_CAPTURED");
+        configure_stream("TIMESYNC", 1.0f);
 		break;
 
 	case MAVLINK_MODE_ONBOARD:
@@ -2078,7 +2079,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("WIND_COV", 10.0f);
 		configure_stream("POSITION_TARGET_LOCAL_NED", 10.0f);
 		configure_stream("SYSTEM_TIME", 1.0f);
-		configure_stream("TIMESYNC", 10.0f);
+		configure_stream("TIMESYNC", 1.0f);
 		configure_stream("CAMERA_CAPTURE", 2.0f);
 		configure_stream("CAMERA_TRIGGER");
 		configure_stream("CAMERA_IMAGE_CAPTURED");
@@ -2129,7 +2130,7 @@ Mavlink::task_main(int argc, char *argv[])
 		configure_stream("LOCAL_POSITION_NED", 30.0f);
 		configure_stream("POSITION_TARGET_GLOBAL_INT", 10.0f);
 		configure_stream("SYSTEM_TIME", 1.0f);
-		configure_stream("TIMESYNC", 10.0f);
+		configure_stream("TIMESYNC", 1.0f);
 		configure_stream("ATTITUDE_TARGET", 8.0f);
 		configure_stream("HOME_POSITION", 0.5f);
 		configure_stream("NAMED_VALUE_FLOAT", 50.0f);
