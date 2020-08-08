@@ -1,0 +1,111 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- MAVROS posix SITL environment launch script -->
+    <!-- launches MAVROS, PX4 SITL, Gazebo environment, and spawns vehicle -->
+    <!-- vehicle pose -->
+    <!-- vehicle model and world -->
+    <arg name="est" default="ekf2"/>
+    <arg name="vehicle" default="iris"/>
+    <arg name="vehicle_usv" default="rover_5"/>
+    <arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/ocean_waves.world"/>
+<!--    <arg name="rcS" default="$(find px4)/posix-configs/SITL/init/$(arg est)/$(arg vehicle)"/>-->
+    <!--     <arg name="rcS" default="$(find px4)/posix-configs/SITL/init/$(arg est)/iris_1"/> -->
+    <!-- gazebo configs -->
+    <arg name="gui" default="true"/>
+    <arg name="debug" default="false"/>
+    <arg name="verbose" default="false"/>
+    <arg name="paused" default="false"/>
+    <arg name="respawn_gazebo" default="false"/>
+    <!-- MAVROS configs -->
+    <arg name="respawn_mavros" default="false"/>
+    <!-- PX4 configs -->
+    <arg name="interactive" default="true"/>
+
+    <group ns="uav1">
+        <!-- MAVROS and vehicle configs -->
+        <arg name="ID" value="1"/>
+        <arg name="fcu_url" default="udp://:14540@localhost:14557"/>
+        <!-- PX4 SITL and vehicle spawn -->
+        <include file="$(find px4)/launch/single_vehicle_spawn.launch">
+            <arg name="x" value="0"/>
+            <arg name="y" value="0"/>
+            <arg name="z" value="0"/>
+            <arg name="R" value="0"/>
+            <arg name="P" value="0"/>
+            <arg name="Y" value="-1.5"/>
+            <arg name="vehicle" value="$(arg vehicle)"/>
+            <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/$(arg vehicle)_$(arg ID)"/>
+            <arg name="mavlink_udp_port" value="14560"/>
+            <arg name="ID" value="$(arg ID)"/>
+        </include>
+        <!-- MAVROS -->
+        <include file="$(find mavros)/launch/px4.launch">
+            <arg name="fcu_url" value="$(arg fcu_url)"/>
+            <arg name="gcs_url" value=""/>
+            <arg name="tgt_system" value="$(arg ID)"/>
+            <arg name="tgt_component" value="1"/>
+        </include>
+    </group>
+
+    <group ns="uav2">
+        <!-- MAVROS and vehicle configs -->
+        <arg name="ID" value="2"/>
+        <arg name="fcu_url" default="udp://:14541@localhost:14559"/>
+        <!-- PX4 SITL and vehicle spawn -->
+        <include file="$(find px4)/launch/single_vehicle_spawn.launch">
+            <arg name="x" value="0"/>
+            <arg name="y" value="5"/>
+            <arg name="z" value="0"/>
+            <arg name="R" value="0"/>
+            <arg name="P" value="0"/>
+            <arg name="Y" value="1.5"/>
+            <arg name="vehicle" value="$(arg vehicle)"/>
+            <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/$(arg vehicle)_$(arg ID)"/>
+            <arg name="mavlink_udp_port" value="14562"/>
+            <arg name="ID" value="$(arg ID)"/>
+        </include>
+        <!-- MAVROS -->
+        <include file="$(find mavros)/launch/px4.launch">
+            <arg name="fcu_url" value="$(arg fcu_url)"/>
+            <arg name="gcs_url" value=""/>
+            <arg name="tgt_system" value="$(arg ID)"/>
+            <arg name="tgt_component" value="1"/>
+        </include>
+    </group>
+
+    <group ns="usv1">
+        <arg name="ID" value="5"/>
+        <arg name="fcu_url" default="udp://:14545@localhost:14530"/>
+        <include file="$(find px4)/launch/rover_mavros_posix_sitl.launch">
+            <!--        <include file="$(find px4)/launch/single_vehicle_spawn.launch">-->
+            <arg name="x" value="5"/>
+            <arg name="y" value="0"/>
+            <arg name="z" value="0"/>
+            <arg name="R" value="0"/>
+            <arg name="P" value="0"/>
+            <arg name="Y" value="0"/>
+            <arg name="mavlink_udp_port" value="14565"/>
+            <arg name="vehicle" value="$(arg vehicle_usv)"/>
+            <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/rover_$(arg ID)"/>
+            <arg name="ID" value="$(arg ID)"/>
+        </include>
+        <!-- MAVROS -->
+        <include file="$(find mavros)/launch/px4.launch">
+            <arg name="fcu_url" value="$(arg fcu_url)"/>
+            <arg name="gcs_url" value=""/>
+            <arg name="tgt_system" value="$(arg ID)"/>
+            <arg name="tgt_component" value="1"/>
+        </include>
+    </group>
+
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="gui" value="$(arg gui)"/>
+        <arg name="world_name" value="$(arg world)"/>
+        <arg name="debug" value="$(arg debug)"/>
+        <arg name="verbose" value="$(arg verbose)"/>
+        <arg name="paused" value="$(arg paused)"/>
+        <arg name="respawn_gazebo" value="$(arg respawn_gazebo)"/>
+    </include>
+    <!--    <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4.launch"/>-->
+    <!--    <include file="$(find uuv_tutorial_dp_controller)/launch/start_tutorial_dp_controller_demo.launch"/>-->
+</launch>
