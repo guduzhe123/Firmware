@@ -124,7 +124,7 @@
     </group>
 
 
-    <group ns="uav5">
+    <group ns="usv1">
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="5"/>
         <arg name="fcu_url" default="udp://:14545@localhost:14530"/>
@@ -151,7 +151,7 @@
         </include>
     </group>
 
-    <group ns="uav6">
+    <group ns="usv2">
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="6"/>
         <arg name="fcu_url" default="udp://:14546@localhost:14531"/>
@@ -178,7 +178,7 @@
         </include>
     </group>
 
-    <group ns="uav7">
+    <group ns="usv3">
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="7"/>
         <arg name="fcu_url" default="udp://:14547@localhost:14532"/>
@@ -208,5 +208,5 @@
 <!--    <include file="$(find uuv_tutorial_dp_controller)/launch/start_tutorial_dp_controller_demo.launch"/>-->
     <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4_umv.launch"/>
 
-    <include file="$(find offboard)/launch/multi_offboard.launch"/>
+<!--    <include file="$(find offboard)/launch/multi_offboard.launch"/>-->
 </launch>
