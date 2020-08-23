@@ -167,6 +167,8 @@ static struct vehicle_land_detected_s land_detector = {};
 static float _eph_threshold_adj =
 	INFINITY;	///< maximum allowable horizontal position uncertainty after adjustment for flight condition
 static bool _skip_pos_accuracy_check = false;
+static struct debug_vect_s debug_vect_ = {};
+static orb_advert_t debug_pub = nullptr;
 
 /**
  * The daemon app only briefly exists to start
@@ -1079,6 +1081,20 @@ Commander::handle_command(vehicle_status_s *status_local, const vehicle_command_
 		// Switch to orbit state and let the orbit task handle the command further
 		main_state_transition(*status_local, commander_state_s::MAIN_STATE_ORBIT, status_flags, &internal_state);
 		break;
+
+    case vehicle_command_s::VEHICLE_CMD_SET_MULTI_VEHICLE_FORMATION: {
+        debug_vect_.x = (float)cmd.param1 ;//
+        PX4_INFO("param1 =  %d", (int)cmd.param1);
+
+        if (debug_pub == nullptr) {
+            debug_pub = orb_advertise(ORB_ID(debug_vect), &debug_vect_);
+        } else {
+            orb_publish(ORB_ID(debug_vect), debug_pub, &debug_vect_);
+        }
+
+        cmd_result = vehicle_command_s::VEHICLE_CMD_RESULT_ACCEPTED;
+    }
+        break;
 
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_0:
 	case vehicle_command_s::VEHICLE_CMD_CUSTOM_1:

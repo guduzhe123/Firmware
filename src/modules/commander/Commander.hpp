@@ -67,6 +67,7 @@
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_local_position.h>
 #include <uORB/topics/esc_status.h>
+#include <uORB/topics/debug_vect.h>
 
 using math::constrain;
 

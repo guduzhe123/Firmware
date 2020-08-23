@@ -3996,6 +3996,8 @@ protected:
 			msg.y = debug.y;
 			msg.z = debug.z;
 
+            PX4_INFO("received param1 =  %d", (int)debug.x);
+
 			mavlink_msg_debug_vect_send_struct(_mavlink->get_channel(), &msg);
 
 			return true;
