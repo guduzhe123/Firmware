@@ -36,7 +36,7 @@ param set GND_WR_D 1.2
 param set GND_WR_I 0.9674
 param set GND_WR_IMAX 0.1
 param set GND_WR_P 2
-param set MAV_TYPE 10
+param set MAV_TYPE 1
 param set MIS_LTRMIN_ALT 0.01
 param set MIS_TAKEOFF_ALT 0.01
 param set NAV_ACC_RAD 0.5
