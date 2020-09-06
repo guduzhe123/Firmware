@@ -310,16 +310,16 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
 
 			// turn yaw first, then control position.
-/*			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
-				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);*/
+			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
+				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
 //                PX4_INFO()
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
 			_att_sp.fw_control_yaw = true;
 			//            _att_sp.thrust = 0.3f;
-/*			PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
-				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));*/
+			PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
+				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
 			float local_x_err = _pos_sp_triplet.current.x - _local_pos.x;
 			float local_y_err = _pos_sp_triplet.current.y - _local_pos.y;
 			float local_pos_err = sqrt(local_x_err * local_x_err + local_y_err * local_y_err);
@@ -368,6 +368,19 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			_att_sp.thrust = mission_throttle;
 		}
 	}
+
+	float dist = pow(_pos_sp_triplet.current.x - _pos_sp_old.current.x, 2) + pow(_pos_sp_triplet.current.y - _pos_sp_old.current.y, 2);
+	if (dist > 2) {
+        _pos_sp_old = _pos_sp_triplet;
+	}
+    matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);
+
+	// TODO use local frame
+/*    struct crosstrack_error_s crosstrackErrorS;
+    local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_old.current.lat, _pos_sp_old.current.lon,
+                         _pos_sp_triplet.current.lat, _pos_sp_triplet.current.lon);
+    _att_sp.yaw_body -= crosstrackErrorS.distance;*/
+
 }
 
 void GroundRoverPositionControl::control_hold(const matrix::Vector2f &current_position,
@@ -677,6 +690,11 @@ GroundRoverPositionControl::task_main()
 			matrix::Vector3f ground_speed(_global_pos.vel_n, _global_pos.vel_e,  _global_pos.vel_d);
 			matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);
 
+			if (!_is_update_takeoff_place) {
+                _pos_sp_old.current.lat = _global_pos.lat;
+                _pos_sp_old.current.lon = _global_pos.lon;
+                _is_update_takeoff_place = true;
+			}
 /*            local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
             double lat_start, double lon_start, double lat_end, double lon_end);*/
 			/*
