@@ -52,10 +52,10 @@ fi
 set MAV_TYPE 10
 
 # Set mixer
-set MIXER marine
+set MIXER marine_add_ruder
 
 # Provide ESC a constant 1500 us pulse
 set PWM_DISARMED 900
 set PWM_MAIN_REV2 1
 set PWM_MAX 2000
-set PWM_MIN 1000
+set PWM_MIN 500

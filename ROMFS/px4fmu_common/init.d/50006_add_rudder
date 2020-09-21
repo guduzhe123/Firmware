@@ -1,17 +1,14 @@
 #!nsh
 #
-# @name Marine ship
+# @name marine
 #
+# @url https://traxxas.com/products/models/electric/stampede-vxl-tsm
 #
 # @type Rover
 # @class Rover
 #
-# @output MAIN2 steering
-# @output MAIN4 throttle
 #
-# @maintainer zhouhua
-#
-# @board px4fmu-v2 exclude
+# @maintainer Marco Zorzi
 #
 
 sh /etc/init.d/rc.ugv_defaults
@@ -55,11 +52,10 @@ fi
 set MAV_TYPE 10
 
 # Set mixer
-set MIXER marine
+set MIXER marine_add_ruder
 
 # Provide ESC a constant 1500 us pulse
 set PWM_DISARMED 900
 set PWM_MAIN_REV2 1
 set PWM_MAX 2000
 set PWM_MIN 1000
-set PWM_OUT 12
