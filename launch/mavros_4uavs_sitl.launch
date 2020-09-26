@@ -24,6 +24,7 @@
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="1"/>
         <arg name="fcu_url" default="udp://:14540@localhost:14557"/>
+        <arg name="gcs_url" value="udp://:14580@localhost:14550"/>
         <!-- PX4 SITL and vehicle spawn -->
         <include file="$(find px4)/launch/single_vehicle_spawn.launch">
             <arg name="x" value="0"/>
@@ -40,7 +41,7 @@
         <!-- MAVROS -->
         <include file="$(find mavros)/launch/px4.launch">
             <arg name="fcu_url" value="$(arg fcu_url)"/>
-            <arg name="gcs_url" value=""/>
+            <arg name="gcs_url" value="$(arg gcs_url)"/>
             <arg name="tgt_system" value="$(arg ID)"/>
             <arg name="tgt_component" value="1"/>
         </include>
@@ -50,6 +51,7 @@
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="2"/>
         <arg name="fcu_url" default="udp://:14541@localhost:14559"/>
+        <arg name="gcs_url" value="udp://:14581@slave:14550"/>
         <!-- PX4 SITL and vehicle spawn -->
         <include file="$(find px4)/launch/single_vehicle_spawn.launch">
             <arg name="x" value="0"/>
@@ -66,7 +68,7 @@
         <!-- MAVROS -->
         <include file="$(find mavros)/launch/px4.launch">
             <arg name="fcu_url" value="$(arg fcu_url)"/>
-            <arg name="gcs_url" value=""/>
+            <arg name="gcs_url" value="$(arg gcs_url)"/>
             <arg name="tgt_system" value="$(arg ID)"/>
             <arg name="tgt_component" value="1"/>
         </include>
@@ -85,6 +87,7 @@
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="3"/>
         <arg name="fcu_url" default="udp://:14543@localhost:14552"/>
+        <arg name="gcs_url" value="udp://:14582@slave:14550"/>
         <!-- PX4 SITL and vehicle spawn -->
         <include file="$(find px4)/launch/single_vehicle_spawn.launch">
             <arg name="x" value="5"/>
@@ -101,7 +104,7 @@
         <!-- MAVROS -->
         <include file="$(find mavros)/launch/px4.launch">
             <arg name="fcu_url" value="$(arg fcu_url)"/>
-            <arg name="gcs_url" value=""/>
+            <arg name="gcs_url" value="$(arg gcs_url)"/>
             <arg name="tgt_system" value="$(arg ID)"/>
             <arg name="tgt_component" value="1"/>
         </include>
@@ -111,6 +114,7 @@
         <!-- MAVROS and vehicle configs -->
         <arg name="ID" value="4"/>
         <arg name="fcu_url" default="udp://:14544@localhost:14554"/>
+        <arg name="gcs_url" value="udp://:14583@slave:14550"/>
         <!-- PX4 SITL and vehicle spawn -->
         <include file="$(find px4)/launch/single_vehicle_spawn.launch">
             <arg name="x" value="-5"/>
@@ -127,7 +131,7 @@
         <!-- MAVROS -->
         <include file="$(find mavros)/launch/px4.launch">
             <arg name="fcu_url" value="$(arg fcu_url)"/>
-            <arg name="gcs_url" value=""/>
+            <arg name="gcs_url" value="$(arg gcs_url)"/>
             <arg name="tgt_system" value="$(arg ID)"/>
             <arg name="tgt_component" value="1"/>
         </include>
