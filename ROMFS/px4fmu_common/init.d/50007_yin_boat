@@ -11,7 +11,7 @@
 # @maintainer Marco Zorzi
 #
 
-sh /etc/init.d/rc.ugv_defaults
+sh /etc/init.d/rc.ugv_yin
 
 if [ $AUTOCNF == yes ]
 then
@@ -55,7 +55,7 @@ set MAV_TYPE 10
 set MIXER marine_add_ruder
 
 # Provide ESC a constant 1500 us pulse
-set PWM_DISARMED 900
+set PWM_DISARMED 1000
 set PWM_MAIN_REV2 1
-set PWM_MAX 1700
-set PWM_MIN 700
+set PWM_MAX 1500
+set PWM_MIN 800
