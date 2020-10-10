@@ -527,6 +527,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			mission_throttle = _parameters.throttle_speed_scaler
 					   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
 
+            mission_throttle = _parameters.throttle_cruise;
 			// Constrain throttle between min and max
 			mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
 
