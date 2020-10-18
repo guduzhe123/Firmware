@@ -443,6 +443,10 @@ Navigator::task_main()
 
 				// CMD_DO_REPOSITION is acknowledged by commander
 
+/*                _pos_sp_triplet = *rep;
+                _pos_sp_triplet.current.valid = true;
+                publish_position_setpoint_triplet();*/
+
 			} else if (cmd.command == vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF) {
 				position_setpoint_triplet_s *rep = get_takeoff_triplet();
 
@@ -783,11 +787,11 @@ Navigator::publish_position_setpoint_triplet()
 {
 	/* do not publish an empty triplet */
 	if (!_pos_sp_triplet.current.valid) {
+        PX4_INFO("111111, _pos_sp_triplet.current.valid = %.d", _pos_sp_triplet.current.valid);
 		return;
 	}
 
-	PX4_INFO(" navigator pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
-//	PX4_INFO("publish pos update");
+    PX4_INFO("3333333, _pos_sp_triplet.current.valid = %.d", _pos_sp_triplet.current.valid);
 
 	/* lazily publish the position setpoint triplet only once available */
 	if (_pos_sp_triplet_pub != nullptr) {
@@ -804,8 +808,8 @@ Navigator::publish_position_setpoint_triplet()
 		_pos_sp_copy_pub = orb_advertise(ORB_ID(position_setpoint_copy), &_pos_sp_triplet);
 	}
 
-	PX4_INFO("copy(0) = %.6f, copy(1) = %.6f", (double)_pos_sp_triplet.previous.lat, (double)_pos_sp_triplet.previous.lon);
-	PX4_INFO("curr(0) = %.6f, curr(1) = %.6f", (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.lon);
+/*	PX4_INFO("copy(0) = %.6f, copy(1) = %.6f", (double)_pos_sp_triplet.previous.lat, (double)_pos_sp_triplet.previous.lon);
+	PX4_INFO("curr(0) = %.6f, curr(1) = %.6f", (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.lon);*/
 }
 
 float

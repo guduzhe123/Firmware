@@ -231,7 +231,6 @@ GroundRoverPositionControl::position_setpoint_triplet_poll()
 
 	if (pos_sp_triplet_updated) {
 		orb_copy(ORB_ID(position_setpoint_triplet), _pos_sp_triplet_sub, &_pos_sp_triplet);
-//		PX4_INFO("pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
 	}
 }
 
@@ -243,8 +242,8 @@ GroundRoverPositionControl::position_setpoint_copy_poll()
 
 	if (pos_sp_copy_updated) {
 		orb_copy(ORB_ID(position_setpoint_copy), _pos_sp_copy_sub, &_pos_sp_copy);
-//		PX4_INFO("pos_sp_triplet.cur.mode = %d", _pos_sp_triplet.current.type);
 	}
+//    _pos_sp_triplet = _pos_sp_copy;
 }
 
 void
@@ -306,6 +305,7 @@ void
 GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &ground_speed,
 		const position_setpoint_triplet_s &pos_sp_triplet)
 {
+	    PX4_INFO("control offboard!!");
 	if (_pos_sp_triplet.current.valid) {
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
 
@@ -376,6 +376,7 @@ void GroundRoverPositionControl::control_hold(const math::Vector<2> &current_pos
                                               const math::Vector<3> &ground_speed,
                                               const position_setpoint_triplet_s &pos_sp_triplet,
                                               const float mission_throttle) {
+	    PX4_INFO("Control Hold!");
     /* previous waypoint */
     math::Vector<2> curr_wp((float)pos_sp_triplet.current.lat, (float)pos_sp_triplet.current.lon);
     /* previous waypoint */
@@ -444,6 +445,7 @@ void GroundRoverPositionControl::control_mission(const math::Vector<2> &current_
     _att_sp.thrust = mission_throttle;
 
     _att_sp.yaw_body -= crosstrackErrorS.distance;
+    PX4_INFO("Mission thrust = %.2f", (double)mission_throttle);
 }
 
 void GroundRoverPositionControl::local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
@@ -465,6 +467,8 @@ bool
 GroundRoverPositionControl::control_position(const math::Vector<2> &current_position,
 		const math::Vector<3> &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
 {
+
+//    PX4_INFO("control position!!");
 	float dt = 0.01; // Using non zero value to a avoid division by zero
 
 	if (_control_position_last_called > 0) {
@@ -511,6 +515,8 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				mission_target_speed = 0;
 			}
 
+//			PX4_INFO("distance = %.2f ", (double)_gnd_pos_ctrl_status.wp_dist);
+
 			if (PX4_ISFINITE(_pos_sp_triplet.current.cruising_speed) &&
 			    _pos_sp_triplet.current.cruising_speed > 0.1f) {
 				mission_target_speed = _pos_sp_triplet.current.cruising_speed;
@@ -526,8 +532,10 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 			// Compute airspeed control out and just scale it as a constant
 			mission_throttle = _parameters.throttle_speed_scaler
 					   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
+			PX4_INFO("mission_target_speed = %.2f, x_vel = %.2f, mission_throttle = %.2f", (double)mission_target_speed, (double)x_vel,
+                     (double)mission_throttle);
 
-            mission_throttle = _parameters.throttle_cruise;
+//            mission_throttle = _parameters.throttle_cruise;
 			// Constrain throttle between min and max
 			mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
 
@@ -557,12 +565,12 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
             // hold mode
 			// TODO change mavlink receiver commmand name
 
-			if (hrt_absolute_time() - pos_sp_triplet.timestamp < 3e+6) { // less than 3 secs
+/*			if (hrt_absolute_time() - pos_sp_triplet.timestamp < 3e+6) { // less than 3 secs
 				control_offboard(dt, ground_speed, pos_sp_triplet);
 
-			} else {
+			} else {*/
                 control_hold(current_position, ground_speed, pos_sp_triplet, mission_throttle);
-			}
+//			}
 		}
 
 		if (was_circle_mode && !_gnd_control.circle_mode()) {
@@ -688,10 +696,6 @@ GroundRoverPositionControl::task_main()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
-/*						PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
-							 (double)_pos_sp_triplet.current.x,
-							 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);*/
-
 			if (control_position(current_position, ground_speed, _pos_sp_triplet)) {
 				_att_sp.timestamp = hrt_absolute_time();
 
@@ -735,7 +739,9 @@ GroundRoverPositionControl::task_main()
 					math::Vector<2> curr_wp((float)_pos_sp_triplet.current.lat, (float)_pos_sp_triplet.current.lon);
 					_gnd_pos_ctrl_status.wp_dist = get_distance_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 								       curr_wp(1));
-
+                    PX4_INFO("current_position(0) = %.6f, current_position(1) = %.6f, _pos_sp_triplet.current.lat = %.6f, current.lon = %.6f",
+                             (double)current_position(0),(double)current_position(1),(double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.lon);
+                    PX4_INFO("dist = %.2f, _att_sp.thrust = %.2f", (double)_gnd_pos_ctrl_status.wp_dist, (double)_att_sp.thrust);
 					// TODO add y distance to yaw control.
 					_nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 							curr_wp(1));
