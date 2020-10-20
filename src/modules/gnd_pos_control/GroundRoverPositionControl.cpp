@@ -512,7 +512,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 				mission_target_speed = _parameters.slow_down_sp;
 
 			} else if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad) {
-				mission_target_speed = 0;
+				mission_target_speed = 0.05;
 			}
 
 //			PX4_INFO("distance = %.2f ", (double)_gnd_pos_ctrl_status.wp_dist);
