@@ -315,12 +315,23 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 	if (_pos_sp_triplet.current.valid) {
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
 
+            if (!_is_update_previous_point) {
+                _pre_target(0) = _local_pos.x;
+                _pre_target(1) = _local_pos.y;
+                _pos_sp_old.current.lat = _global_pos.lat;
+                _pos_sp_old.current.lon = _global_pos.lon;
+                PX4_INFO("111 _pos_sp_old.current.lat = %.6f, lon = %.6f", (double)_pos_sp_old.current.lat,
+                         (double)_pos_sp_old.current.lon);
+                _is_update_previous_point = true;
+            }
+
 			// turn yaw first, then control position.
 			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
-			PX4_INFO("_pos_sp_triplet.pre.x = %.2f, y = %.2f, z = %.2f", (double)pos_sp_triplet.previous.x,
-				 (double)pos_sp_triplet.previous.y, (double)pos_sp_triplet.previous.z);
+			PX4_INFO("_pos_sp_triplet.pre.x = %.2f, y = %.2f, z = %.2f", (double)_pre_target(0),
+				 (double)_pre_target(1), (double)_pre_target(2));
 
+//                PX4_INFO()
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
@@ -338,6 +349,15 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			}
 
 			float mission_target_speed = 0.2f * local_pos_err;
+
+			PX4_INFO("local_pos_err = %.2f", (double)local_pos_err);
+			if (local_pos_err < 5) {
+                _pre_target(0) = _pos_sp_triplet.current.x;
+                _pre_target(1) = _pos_sp_triplet.current.y;
+
+                _pos_sp_old.current.lat = _global_pos.lat;
+                _pos_sp_old.current.lon = _global_pos.lon;
+			}
 
 			// Velocity in body frame
 			const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
@@ -383,17 +403,22 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 		}
 	}
 
-	float dist = pow(_pos_sp_triplet.current.x - _pos_sp_old.current.x, 2) + pow(_pos_sp_triplet.current.y - _pos_sp_old.current.y, 2);
+/*	float dist = pow(_pos_sp_triplet.current.x - _pos_sp_old.current.x, 2) + pow(_pos_sp_triplet.current.y - _pos_sp_old.current.y, 2);
 	if (dist > 2) {
         _pos_sp_old = _pos_sp_triplet;
-	}
+	}*/
     matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);
+    double lat_res, lon_res;
+    PX4_INFO("_pos_sp_takeoff.current.lat = %.6f, lon = %.6f", (double)_pos_sp_takeoff.current.lat,
+             (double)_pos_sp_takeoff.current.lon);
+    add_vector_to_global_position(_pos_sp_takeoff.current.lat, _pos_sp_takeoff.current.lon, _pos_sp_triplet.current.x, _pos_sp_triplet.current.y,
+                                  lat_res, lon_res);
 
 	// TODO use local frame
-/*    struct crosstrack_error_s crosstrackErrorS;
+    struct crosstrack_error_s crosstrackErrorS;
     local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_old.current.lat, _pos_sp_old.current.lon,
-                         _pos_sp_triplet.current.lat, _pos_sp_triplet.current.lon);
-    _att_sp.yaw_body -= crosstrackErrorS.distance;*/
+                         lat_res, lon_res);
+    _att_sp.yaw_body -=  crosstrackErrorS.distance;
 
 }
 
@@ -705,8 +730,8 @@ GroundRoverPositionControl::task_main()
 			matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);
 
 			if (!_is_update_takeoff_place) {
-                _pos_sp_old.current.lat = _global_pos.lat;
-                _pos_sp_old.current.lon = _global_pos.lon;
+                _pos_sp_takeoff.current.lat = _global_pos.lat;
+                _pos_sp_takeoff.current.lon = _global_pos.lon;
                 _is_update_takeoff_place = true;
 			}
 /*            local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,

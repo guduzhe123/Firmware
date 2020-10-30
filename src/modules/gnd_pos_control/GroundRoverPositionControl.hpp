@@ -117,11 +117,14 @@ private:
 	float  _gnd_pos_dist_pre{};
 	float  _gnd_pos_dist_i{};
 	bool   _is_update_takeoff_place{false};
+	bool   _is_update_previous_point{false};
+    matrix::Vector3f _pre_target{0,0,0};
 
 	fw_pos_ctrl_status_s			_gnd_pos_ctrl_status{};		/**< navigation capabilities */
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
 	position_setpoint_triplet_s		_pos_sp_triplet{};		/**< triplet of mission items */
 	position_setpoint_triplet_s		_pos_sp_old{};		/**< triplet of mission items */
+	position_setpoint_triplet_s		_pos_sp_takeoff{};		/**< triplet of mission items */
 	position_setpoint_copy_s		_pos_sp_copy{};		/**< triplet of mission items */
 	vehicle_attitude_setpoint_s		_att_sp{};			/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_control_mode{};			/**< control mode */
