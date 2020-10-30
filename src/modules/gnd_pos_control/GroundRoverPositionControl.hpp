@@ -102,6 +102,7 @@ private:
 	bool		_task_should_exit{false};		/**< if true, sensor task should exit */
 	bool		_task_running{false};			/**< if true, task is running in its mainloop */
 	bool        _achieved{false};              /* true if vehicle achieved the target point*/
+	bool       call_offboard_{false};
 
 	int		_control_mode_sub{-1};		/**< control mode subscription */
 	int		_global_pos_sub{-1};
@@ -249,7 +250,7 @@ private:
 	 * Control position.
 	 */
 	bool		control_position(const matrix::Vector2f &global_pos, const matrix::Vector3f &ground_speed,
-					 const position_setpoint_triplet_s &_pos_sp_triplet);
+					 position_setpoint_triplet_s &_pos_sp_triplet);
 
 	void        control_hold(const matrix::Vector2f &current_position,
                              const matrix::Vector3f &ground_speed,
@@ -262,7 +263,7 @@ private:
                              const float mission_throttle);
 
 	void        control_offboard(float dt, const matrix::Vector3f &ground_speed,
-				     const position_setpoint_triplet_s &pos_sp_triplet);
+				     position_setpoint_triplet_s &pos_sp_triplet);
 
 	void        offboard_local_sp();
 

@@ -304,15 +304,23 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 
 void
 GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &ground_speed,
-		const position_setpoint_triplet_s &pos_sp_triplet)
+		position_setpoint_triplet_s &pos_sp_triplet)
 {
+    if (!call_offboard_) {
+        pos_sp_triplet.previous.x = _local_pos.x;
+        pos_sp_triplet.previous.y = _local_pos.y;
+        call_offboard_ = true;
+    }
+
 	if (_pos_sp_triplet.current.valid) {
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
 
 			// turn yaw first, then control position.
 			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
-//                PX4_INFO()
+			PX4_INFO("_pos_sp_triplet.pre.x = %.2f, y = %.2f, z = %.2f", (double)pos_sp_triplet.previous.x,
+				 (double)pos_sp_triplet.previous.y, (double)pos_sp_triplet.previous.z);
+
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
@@ -323,6 +331,12 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			float local_x_err = _pos_sp_triplet.current.x - _local_pos.x;
 			float local_y_err = _pos_sp_triplet.current.y - _local_pos.y;
 			float local_pos_err = sqrt(local_x_err * local_x_err + local_y_err * local_y_err);
+
+			if (local_pos_err < 2) {
+                call_offboard_ = false;
+                PX4_INFO("arrived at target!!, local_pos_err = %.2f", (double)local_pos_err);
+			}
+
 			float mission_target_speed = 0.2f * local_pos_err;
 
 			// Velocity in body frame
@@ -473,7 +487,7 @@ void GroundRoverPositionControl::local_y_compensation(struct crosstrack_error_s 
 
 bool
 GroundRoverPositionControl::control_position(const matrix::Vector2f &current_position,
-		const matrix::Vector3f &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
+		const matrix::Vector3f &ground_speed, position_setpoint_triplet_s &pos_sp_triplet)
 {
 	float dt = 0.01; // Using non zero value to a avoid division by zero
 
