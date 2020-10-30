@@ -303,15 +303,28 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 
 void
 GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &ground_speed,
-		const position_setpoint_triplet_s &pos_sp_triplet)
+		position_setpoint_triplet_s &pos_sp_triplet, const math::Vector<2> &current_position)
 {
 	    PX4_INFO("control offboard!!");
 	if (_pos_sp_triplet.current.valid) {
 		if (_control_mode.flag_control_position_enabled && _pos_sp_triplet.current.position_valid) {
 
+            if (!_is_update_previous_point) {
+                _pre_target(0) = _local_pos.x;
+                _pre_target(1) = _local_pos.y;
+                _pos_sp_old.current.lat = _global_pos.lat;
+                _pos_sp_old.current.lon = _global_pos.lon;
+                PX4_INFO("111 _pos_sp_old.current.lat = %.6f, lon = %.6f", (double)_pos_sp_old.current.lat,
+                         (double)_pos_sp_old.current.lon);
+                _is_update_previous_point = true;
+            }
+
 			// turn yaw first, then control position.
 			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
 				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
+			PX4_INFO("_pos_sp_triplet.pre.x = %.2f, y = %.2f, z = %.2f", (double)_pre_target(0),
+				 (double)_pre_target(1), (double)_pre_target(2));
+
 //                PX4_INFO()
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
@@ -322,6 +335,15 @@ GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &gr
 				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
 			float local_pos_err = fabsf(_pos_sp_triplet.current.x - _local_pos.x);
 			float mission_target_speed = 0.2f * local_pos_err;
+
+			PX4_INFO("local_pos_err = %.2f", (double)local_pos_err);
+			if (local_pos_err < 5) {
+                _pre_target(0) = _pos_sp_triplet.current.x;
+                _pre_target(1) = _pos_sp_triplet.current.y;
+
+                _pos_sp_old.current.lat = _global_pos.lat;
+                _pos_sp_old.current.lon = _global_pos.lon;
+			}
 
 			// Velocity in body frame
 			const Dcmf R_to_body(Quatf(_sub_attitude.get().q).inversed());
@@ -370,6 +392,24 @@ GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &gr
 		}
 
 	}
+
+/*	float dist = pow(_pos_sp_triplet.current.x - _pos_sp_old.current.x, 2) + pow(_pos_sp_triplet.current.y - _pos_sp_old.current.y, 2);
+	if (dist > 2) {
+        _pos_sp_old = _pos_sp_triplet;
+	}*/
+//    math::Vector<2>  current_position(/*(float)*/ _global_pos.lat, /*(float)*/ _global_pos.lon);
+    double lat_res, lon_res;
+/*    PX4_INFO("_pos_sp_takeoff.current.lat = %.6f, lon = %.6f", (double)_pos_sp_takeoff.current.lat,
+             (double)_pos_sp_takeoff.current.lon);*/
+    vector_to_global_position(_pos_sp_takeoff.current.lat, _pos_sp_takeoff.current.lon, _pos_sp_triplet.current.x,
+            _pos_sp_triplet.current.y,lat_res, lon_res);
+
+	// TODO use local frame
+    struct crosstrack_error_s crosstrackErrorS;
+    local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_old.current.lat, _pos_sp_old.current.lon,
+                         lat_res, lon_res);
+//    _att_sp.yaw_body -=  crosstrackErrorS.distance;
+
 }
 
 void GroundRoverPositionControl::control_hold(const math::Vector<2> &current_position,
@@ -465,7 +505,7 @@ void GroundRoverPositionControl::local_y_compensation(struct crosstrack_error_s 
 
 bool
 GroundRoverPositionControl::control_position(const math::Vector<2> &current_position,
-		const math::Vector<3> &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
+                                             const math::Vector<3> &ground_speed, position_setpoint_triplet_s &pos_sp_triplet)
 {
 
 //    PX4_INFO("control position!!");
@@ -477,7 +517,7 @@ GroundRoverPositionControl::control_position(const math::Vector<2> &current_posi
 	_control_position_last_called = hrt_absolute_time();
 	bool setpoint = true;
 	if (_control_mode.flag_control_offboard_enabled) {
-		control_offboard(dt, ground_speed, pos_sp_triplet);
+		control_offboard(dt, ground_speed, pos_sp_triplet, current_position);
 
 	} else if (_control_mode.flag_control_auto_enabled && pos_sp_triplet.current.valid) {
 		/* AUTONOMOUS FLIGHT */
@@ -690,6 +730,14 @@ GroundRoverPositionControl::task_main()
 			math::Vector<3> ground_speed(_global_pos.vel_n, _global_pos.vel_e,  _global_pos.vel_d);
 			math::Vector<2> current_position((float)_global_pos.lat, (float)_global_pos.lon);
 
+/*			matrix::Vector3f ground_speed(_global_pos.vel_n, _global_pos.vel_e,  _global_pos.vel_d);
+			matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);*/
+
+			if (!_is_update_takeoff_place) {
+                _pos_sp_takeoff.current.lat = _global_pos.lat;
+                _pos_sp_takeoff.current.lon = _global_pos.lon;
+                _is_update_takeoff_place = true;
+			}
 /*            local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
             double lat_start, double lon_start, double lat_end, double lon_end);*/
 			/*
@@ -856,4 +904,14 @@ int gnd_pos_control_main(int argc, char *argv[])
 
 	warnx("unrecognized command");
 	return 1;
+}
+
+void GroundRoverPositionControl::vector_to_global_position(double lat_now, double lon_now, float v_n, float v_e, double& lat_res,
+                                                           double& lon_res)
+{
+    double lat_now_rad = lat_now * M_DEG_TO_RAD;
+    double lon_now_rad = lon_now * M_DEG_TO_RAD;
+
+    lat_res = (lat_now_rad + (double)v_n / CONSTANTS_RADIUS_OF_EARTH) * M_RAD_TO_DEG;
+    lon_res = (lon_now_rad + (double)v_e / (CONSTANTS_RADIUS_OF_EARTH * cos(lat_now_rad))) * M_RAD_TO_DEG;
 }

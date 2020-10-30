@@ -115,10 +115,15 @@ private:
 	float   _nav_bearing{};
 	float  _gnd_pos_dist_pre{};
 	float  _gnd_pos_dist_i{};
+	bool   _is_update_takeoff_place{false};
+	bool   _is_update_previous_point{false};
+    matrix::Vector3f _pre_target{0,0,0};
 
 	fw_pos_ctrl_status_s			_gnd_pos_ctrl_status{};		/**< navigation capabilities */
 	manual_control_setpoint_s		_manual{};			/**< r/c channel data */
 	position_setpoint_triplet_s		_pos_sp_triplet{};		/**< triplet of mission items */
+	position_setpoint_triplet_s		_pos_sp_old{};		/**< triplet of mission items */
+	position_setpoint_triplet_s		_pos_sp_takeoff{};		/**< triplet of mission items */
 	position_setpoint_copy_s		_pos_sp_copy{};		/**< triplet of mission items */
 	vehicle_attitude_setpoint_s		_att_sp{};			/**< vehicle attitude setpoint */
 	vehicle_control_mode_s			_control_mode{};			/**< control mode */
@@ -247,7 +252,7 @@ private:
 	 * Control position.
 	 */
 	bool		control_position(const math::Vector<2> &global_pos, const math::Vector<3> &ground_speed,
-					 const position_setpoint_triplet_s &_pos_sp_triplet);
+					 position_setpoint_triplet_s &_pos_sp_triplet);
 
 	void        control_hold(const math::Vector<2> &current_position,
                              const math::Vector<3> &ground_speed,
@@ -260,11 +265,13 @@ private:
                              const float mission_throttle);
 
 	void        control_offboard(float dt, const math::Vector<3> &ground_speed,
-				     const position_setpoint_triplet_s &pos_sp_triplet);
+				     position_setpoint_triplet_s &pos_sp_triplet,  const math::Vector<2> &current_position);
 
 	void        local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
                                      double lat_start, double lon_start, double lat_end, double lon_end);
 
+    void vector_to_global_position(double lat_now, double lon_now, float v_n, float v_e, double &lat_res,
+                                                                   double &lon_res);
 	/**
 	 * Shim for calling task_main from task_create.
 	 */
