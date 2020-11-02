@@ -291,6 +291,18 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 	}
 }
 
+void
+GroundRoverPositionControl::home_position_update()
+{
+    bool updated = false;
+    orb_check(_home_pos_sub, &updated);
+
+    if (updated) {
+        orb_copy(ORB_ID(home_position), _home_pos_sub, &_home_pos);
+        PX4_INFO("home gps lat: %.8f, lon = %.8f", _home_pos.lat, _home_pos.lon);
+    }
+}
+
 //void GroundRoverPositionControl::vehicle_local_pos_poll()
 //{
 //	bool local_pos_updated;
@@ -329,12 +341,18 @@ GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &gr
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = _wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
+
+            math::Vector<2> curr_wp;
+            curr_wp(0) = _pos_sp_triplet.current.lat;
+            curr_wp(1) = _pos_sp_triplet.current.lon;
+            _nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
+                                                        curr_wp(1));
 			_att_sp.fw_control_yaw = true;
 			//            _att_sp.thrust = 0.3f;
 			PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
 				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
 			float local_pos_err = fabsf(_pos_sp_triplet.current.x - _local_pos.x);
-			float mission_target_speed = 0.2f * local_pos_err;
+			float mission_target_speed = _parameters.slow_down_sp * local_pos_err;
 
 			PX4_INFO("local_pos_err = %.2f", (double)local_pos_err);
 			if (local_pos_err < 5) {
@@ -408,8 +426,7 @@ GroundRoverPositionControl::control_offboard(float dt, const math::Vector<3> &gr
     struct crosstrack_error_s crosstrackErrorS;
     local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_old.current.lat, _pos_sp_old.current.lon,
                          lat_res, lon_res);
-//    _att_sp.yaw_body -=  crosstrackErrorS.distance;
-
+    _att_sp.yaw_body -=  crosstrackErrorS.distance;
 }
 
 void GroundRoverPositionControl::control_hold(const math::Vector<2> &current_position,
@@ -645,6 +662,7 @@ GroundRoverPositionControl::task_main()
 	_pos_sp_copy_sub = orb_subscribe(ORB_ID(position_setpoint_copy));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
+    _home_pos_sub = orb_subscribe(ORB_ID(home_position));
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
@@ -669,6 +687,7 @@ GroundRoverPositionControl::task_main()
 	fds[1].events = POLLIN;
 
 	_task_running = true;
+    home_position_update();
 
 	while (!_task_should_exit) {
 
