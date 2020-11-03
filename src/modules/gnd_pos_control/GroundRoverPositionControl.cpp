@@ -292,6 +292,18 @@ void GroundRoverPositionControl::gnd_pos_ctrl_status_publish()
 	}
 }
 
+void
+GroundRoverPositionControl::home_position_update()
+{
+    bool updated = false;
+    orb_check(_home_pos_sub, &updated);
+
+    if (updated) {
+        orb_copy(ORB_ID(home_position), _home_pos_sub, &_home_pos);
+        PX4_INFO("home gps lat: %.8f, lon = %.8f", _home_pos.lat, _home_pos.lon);
+    }
+}
+
 //void GroundRoverPositionControl::vehicle_local_pos_poll()
 //{
 //	bool local_pos_updated;
@@ -644,7 +656,9 @@ GroundRoverPositionControl::task_main()
 	_pos_sp_copy_sub = orb_subscribe(ORB_ID(position_setpoint_copy));
 	_att_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_local_pos_sub = orb_subscribe(ORB_ID(vehicle_local_position));
+    _home_pos_sub = orb_subscribe(ORB_ID(home_position));
 
+    home_position_update();
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
 
@@ -725,6 +739,12 @@ GroundRoverPositionControl::task_main()
 			vehicle_status_poll();
 			_sub_attitude.update();
 			_sub_sensors.update();
+
+            bool updated;
+            orb_check(_home_pos_sub, &updated);
+            if (updated) {
+                home_position_update();
+            }
 
 			matrix::Vector3f ground_speed(_global_pos.vel_n, _global_pos.vel_e,  _global_pos.vel_d);
 			matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);

@@ -110,12 +110,12 @@
         </include>
     </group>
 
-    <group ns="uav4">
-        <!-- MAVROS and vehicle configs -->
+    <!--<group ns="uav4">
+        &lt;!&ndash; MAVROS and vehicle configs &ndash;&gt;
         <arg name="ID" value="4"/>
         <arg name="fcu_url" default="udp://:14544@localhost:14554"/>
         <arg name="gcs_url" value="udp://:14583@slave:14550"/>
-        <!-- PX4 SITL and vehicle spawn -->
+        &lt;!&ndash; PX4 SITL and vehicle spawn &ndash;&gt;
         <include file="$(find px4)/launch/single_vehicle_spawn.launch">
             <arg name="x" value="-5"/>
             <arg name="y" value="0"/>
@@ -128,14 +128,14 @@
             <arg name="mavlink_udp_port" value="14564"/>
             <arg name="ID" value="$(arg ID)"/>
         </include>
-        <!-- MAVROS -->
+        &lt;!&ndash; MAVROS &ndash;&gt;
         <include file="$(find mavros)/launch/px4.launch">
             <arg name="fcu_url" value="$(arg fcu_url)"/>
             <arg name="gcs_url" value="$(arg gcs_url)"/>
             <arg name="tgt_system" value="$(arg ID)"/>
             <arg name="tgt_component" value="1"/>
         </include>
-    </group>
+    </group>-->
 
     <!--    <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4.launch"/>-->
     <!--    <include file="$(find uuv_tutorial_dp_controller)/launch/start_tutorial_dp_controller_demo.launch"/>-->
