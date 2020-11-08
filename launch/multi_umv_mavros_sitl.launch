@@ -132,7 +132,7 @@
         <include file="$(find px4)/launch/rover_mavros_posix_sitl.launch">
 <!--        <include file="$(find px4)/launch/single_vehicle_spawn.launch">-->
             <arg name="x" value="15"/>
-            <arg name="y" value="-500"/>
+            <arg name="y" value="0"/>
             <arg name="z" value="0"/>
             <arg name="R" value="0"/>
             <arg name="P" value="0"/>
@@ -159,7 +159,7 @@
         <include file="$(find px4)/launch/rover_mavros_posix_sitl.launch">
             <!--        <include file="$(find px4)/launch/single_vehicle_spawn.launch">-->
             <arg name="x" value="15"/>
-            <arg name="y" value="-520"/>
+            <arg name="y" value="-15"/>
             <arg name="z" value="0"/>
             <arg name="R" value="0"/>
             <arg name="P" value="0"/>
@@ -186,7 +186,7 @@
         <include file="$(find px4)/launch/rover_mavros_posix_sitl.launch">
             <!--        <include file="$(find px4)/launch/single_vehicle_spawn.launch">-->
             <arg name="x" value="15"/>
-            <arg name="y" value="-540"/>
+            <arg name="y" value="-30"/>
             <arg name="z" value="0"/>
             <arg name="R" value="0"/>
             <arg name="P" value="0"/>

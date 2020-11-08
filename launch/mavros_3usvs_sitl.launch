@@ -32,7 +32,7 @@
             <arg name="z" value="0"/>
             <arg name="R" value="0"/>
             <arg name="P" value="0"/>
-            <arg name="Y" value="0"/>
+            <arg name="Y" value="-1.732"/>
             <arg name="mavlink_udp_port" value="14565"/>
             <arg name="vehicle" value="rover_5"/>
             <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/rover_$(arg ID)"/>
@@ -59,7 +59,7 @@
             <arg name="z" value="0"/>
             <arg name="R" value="0"/>
             <arg name="P" value="0"/>
-            <arg name="Y" value="0"/>
+            <arg name="Y" value="-1.732"/>
             <arg name="mavlink_udp_port" value="14566"/>
             <arg name="vehicle" value="rover_6"/>
             <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/rover_$(arg ID)"/>
@@ -86,7 +86,7 @@
             <arg name="z" value="0"/>
             <arg name="R" value="0"/>
             <arg name="P" value="0"/>
-            <arg name="Y" value="0"/>
+            <arg name="Y" value="-1.732"/>
             <arg name="mavlink_udp_port" value="14567"/>
             <arg name="vehicle" value="rover_7"/>
             <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/rover_$(arg ID)"/>
@@ -101,13 +101,13 @@
         </include>
     </group>
 
-    <group ns="uuv1">
-        <!-- MAVROS and vehicle configs -->
+  <!--  <group ns="uuv1">
+        &lt;!&ndash; MAVROS and vehicle configs &ndash;&gt;
         <arg name="ID" value="8"/>
         <arg name="fcu_url" default="udp://:14548@localhost:14533"/>
-        <!-- PX4 SITL and vehicle spawn -->
+        &lt;!&ndash; PX4 SITL and vehicle spawn &ndash;&gt;
         <include file="$(find px4)/launch/rover_mavros_posix_sitl.launch">
-            <!--        <include file="$(find px4)/launch/single_vehicle_spawn.launch">-->
+            &lt;!&ndash;        <include file="$(find px4)/launch/single_vehicle_spawn.launch">&ndash;&gt;
             <arg name="x" value="-15"/>
             <arg name="y" value="-15"/>
             <arg name="z" value="0"/>
@@ -119,14 +119,14 @@
             <arg name="rcS" value="$(find px4)/posix-configs/SITL/init/$(arg est)/rover_$(arg ID)"/>
             <arg name="ID" value="$(arg ID)"/>
         </include>
-        <!-- MAVROS -->
+        &lt;!&ndash; MAVROS &ndash;&gt;
         <include file="$(find mavros)/launch/px4.launch">
             <arg name="fcu_url" value="$(arg fcu_url)"/>
             <arg name="gcs_url" value=""/>
             <arg name="tgt_system" value="$(arg ID)"/>
             <arg name="tgt_component" value="1"/>
         </include>
-    </group>
+    </group>-->
 <!--    <include file="$(find uuv_tutorial_dp_controller)/launch/start_tutorial_dp_controller_demo.launch"/>-->
 <!--    <include file="$(find uuv_gazebo_worlds)/launch/ocean_waves_px4_umv.launch"/>-->
 
