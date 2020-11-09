@@ -355,6 +355,7 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			float local_y_err = _pos_sp_triplet.current.y - _local_pos.y;
 			float local_pos_err = sqrt(local_x_err * local_x_err + local_y_err * local_y_err);
 			float mission_target_speed = _parameters.slow_down_sp * local_pos_err;
+            mission_target_speed = math::constrain(mission_target_speed, 0, _parameters.gndspeed_max);
 
 			PX4_INFO("local_pos_err = %.2f", (double)local_pos_err);
 			if (local_pos_err < 5) {
