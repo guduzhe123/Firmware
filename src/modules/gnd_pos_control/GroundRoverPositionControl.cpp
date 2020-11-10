@@ -355,7 +355,7 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			float local_y_err = _pos_sp_triplet.current.y - _local_pos.y;
 			float local_pos_err = sqrt(local_x_err * local_x_err + local_y_err * local_y_err);
 			float mission_target_speed = _parameters.slow_down_sp * local_pos_err;
-            mission_target_speed = math::constrain(mission_target_speed, 0, _parameters.gndspeed_max);
+            mission_target_speed = math::constrain(mission_target_speed, 0.0f, _parameters.gndspeed_max);
 
 			PX4_INFO("local_pos_err = %.2f", (double)local_pos_err);
 			if (local_pos_err < 5) {
@@ -392,6 +392,7 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 
 			const float x_vel = vel(0);
 			const float x_acc = _sub_sensors.get().accel_x;
+			PX4_INFO("\n");
 			PX4_INFO("mission_target_speed = %.2f, x_vel = %.2f, yaw_sp = %.2f", (double)mission_target_speed, (double)x_vel,
 				 (double)_pos_sp_triplet.current.yawspeed);
 
@@ -405,8 +406,10 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
-			_att_sp.yaw_body = pos_sp_triplet.current.yawspeed;
+			_att_sp.yaw_body = (double)pos_sp_triplet.current.yawspeed /** sin(_time)*/;
 			_att_sp.thrust = mission_throttle;
+            _time++;
+            PX4_INFO("_att_sp.yaw_body = %.2f, _att_sp.thrust = %.2f", (double)_att_sp.yaw_body, (double)_att_sp.thrust);
 		}
 	}
 
