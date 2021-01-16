@@ -52,6 +52,7 @@ param set SYS_RESTART_TYPE 2
 param set SITL_UDP_PRT 14565
 parm set GND_SPEED_TRIM 2.0
 param set COM_ARM_EKF_AB 0.01
+param set GND_ACCPT_RAD 2.0
 replay tryapplyparams
 simulator start -s
 tone_alarm start

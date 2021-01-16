@@ -51,6 +51,7 @@ param set SYS_MC_EST_GROUP 2
 param set SYS_RESTART_TYPE 2
 param set SITL_UDP_PRT 14566
 parm set GND_SPEED_TRIM 2.0
+param set GND_ACCPT_RAD 2.0
 replay tryapplyparams
 simulator start -s
 tone_alarm start

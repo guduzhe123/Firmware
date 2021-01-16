@@ -290,5 +290,5 @@ private:
 
     float wrap_pi(float bearing);
 
-    void check_achieved(const position_setpoint_triplet_s &pos_sp_triplet, float mission_throttle);
+    void check_achieved();
 };

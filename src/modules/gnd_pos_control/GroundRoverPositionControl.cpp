@@ -332,32 +332,19 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
                 _pre_target(1) = _local_pos.y;
                 _pos_sp_old.current.lat = _global_pos.lat;
                 _pos_sp_old.current.lon = _global_pos.lon;
-                PX4_INFO("111 _pos_sp_old.current.lat = %.6f, lon = %.6f", (double)_pos_sp_old.current.lat,
-                         (double)_pos_sp_old.current.lon);
                 _is_update_previous_point = true;
             }
 
-			// turn yaw first, then control position.
-			PX4_INFO("_pos_sp_triplet.current.x = %.2f, y = %.2f, z = %.2f", (double)_pos_sp_triplet.current.x,
-				 (double)_pos_sp_triplet.current.y, (double)_pos_sp_triplet.current.z);
-			PX4_INFO("_pos_sp_triplet.pre.x = %.2f, y = %.2f, z = %.2f", (double)_pre_target(0),
-				 (double)_pre_target(1), (double)_pre_target(2));
-
-//                PX4_INFO()
 			_att_sp.roll_body = 0.0f;
 			_att_sp.pitch_body = 0.0f;
 			_att_sp.yaw_body = wrap_pi(atan2f(_pos_sp_triplet.current.y - _local_pos.y, _pos_sp_triplet.current.x - _local_pos.x));
 			_att_sp.fw_control_yaw = true;
-			//            _att_sp.thrust = 0.3f;
-			PX4_INFO("local.x = %.2f, local.y = %.2f, _att_sp.yaw_body = %.2f", (double)_local_pos.x, (double)_local_pos.y,
-				 (double)(_att_sp.yaw_body * 180.0f / 3.14f));
 			float local_x_err = _pos_sp_triplet.current.x - _local_pos.x;
 			float local_y_err = _pos_sp_triplet.current.y - _local_pos.y;
 			float local_pos_err = sqrt(local_x_err * local_x_err + local_y_err * local_y_err);
 			float mission_target_speed = _parameters.slow_down_sp * local_pos_err;
             mission_target_speed = math::constrain(mission_target_speed, 0.0f, _parameters.gndspeed_max);
 
-			PX4_INFO("local_pos_err = %.2f", (double)local_pos_err);
 			if (local_pos_err < 5) {
                 _pre_target(0) = _pos_sp_triplet.current.x;
                 _pre_target(1) = _pos_sp_triplet.current.y;
@@ -378,9 +365,7 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 					   * pid_calculate(&_speed_ctrl, mission_target_speed, x_vel, x_acc, dt);
 			// Constrain throttle between min and max
 			mission_throttle = math::constrain(mission_throttle, _parameters.throttle_min, _parameters.throttle_max);
-
 			_att_sp.thrust = mission_throttle;
-
 
 		} else if (_control_mode.flag_control_velocity_enabled && _pos_sp_triplet.current.velocity_valid) {
 			float mission_throttle;
@@ -392,9 +377,9 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 
 			const float x_vel = vel(0);
 			const float x_acc = _sub_sensors.get().accel_x;
-			PX4_INFO("\n");
+/*			PX4_INFO("\n");
 			PX4_INFO("mission_target_speed = %.2f, x_vel = %.2f, yaw_sp = %.2f", (double)mission_target_speed, (double)x_vel,
-				 (double)_pos_sp_triplet.current.yawspeed);
+				 (double)_pos_sp_triplet.current.yawspeed);*/
 
 
 			mission_throttle = _parameters.throttle_speed_scaler
@@ -409,18 +394,13 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
 			_att_sp.yaw_body = (double)pos_sp_triplet.current.yawspeed /** sin(_time)*/;
 			_att_sp.thrust = mission_throttle;
             _time++;
-            PX4_INFO("_att_sp.yaw_body = %.2f, _att_sp.thrust = %.2f", (double)_att_sp.yaw_body, (double)_att_sp.thrust);
 		}
 	}
 
-/*	float dist = pow(_pos_sp_triplet.current.x - _pos_sp_old.current.x, 2) + pow(_pos_sp_triplet.current.y - _pos_sp_old.current.y, 2);
-	if (dist > 2) {
-        _pos_sp_old = _pos_sp_triplet;
-	}*/
     matrix::Vector2f current_position((float)_global_pos.lat, (float)_global_pos.lon);
     double lat_res, lon_res;
-    PX4_INFO("_pos_sp_takeoff.current.lat = %.6f, lon = %.6f", (double)_pos_sp_takeoff.current.lat,
-             (double)_pos_sp_takeoff.current.lon);
+/*    PX4_INFO("_pos_sp_takeoff.current.lat = %.6f, lon = %.6f", (double)_pos_sp_takeoff.current.lat,
+             (double)_pos_sp_takeoff.current.lon);*/
     add_vector_to_global_position(_pos_sp_takeoff.current.lat, _pos_sp_takeoff.current.lon, _pos_sp_triplet.current.x, _pos_sp_triplet.current.y,
                                   lat_res, lon_res);
 
@@ -430,6 +410,7 @@ GroundRoverPositionControl::control_offboard(float dt, const matrix::Vector3f &g
                          lat_res, lon_res);
     _att_sp.yaw_body -=  crosstrackErrorS.distance;
 
+    check_achieved();
 }
 
 void GroundRoverPositionControl::control_hold(const matrix::Vector2f &current_position,
@@ -440,8 +421,8 @@ void GroundRoverPositionControl::control_hold(const matrix::Vector2f &current_po
     matrix::Vector2f curr_wp((float)pos_sp_triplet.current.lat, (float)pos_sp_triplet.current.lon);
     matrix::Vector2f ground_speed_2d = {ground_speed(0), ground_speed(1)};
 
-    PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
-    PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));
+/*    PX4_INFO("prev_wp(0) = %.6f, prev_wp(1) = %.6f", (double)_pos_sp_copy.current.lat, (double)_pos_sp_copy.current.lon);
+    PX4_INFO("curr_wp(0) = %.6f, curr_wp(1) = %.6f", (double)curr_wp(0), (double)curr_wp(1));*/
 
     // TODO need to know the target of the whole mission. 任务目标经纬度
     curr_wp(0) = _pos_sp_copy.current.lat;
@@ -470,9 +451,8 @@ void GroundRoverPositionControl::control_hold(const matrix::Vector2f &current_po
     } else {
         _att_sp.thrust = mission_throttle;
     }
-    PX4_INFO("_att_sp.yaw_body = %.2f, fw_pos_ctrl_status_s.wp_dist = %.2f, _att_sp.thrust = %.2f",
-             (double)_att_sp.yaw_body, (double)_gnd_pos_ctrl_status.wp_dist, (double)_att_sp.thrust);
-
+/*    PX4_INFO("_att_sp.yaw_body = %.2f, fw_pos_ctrl_status_s.wp_dist = %.2f, _att_sp.thrust = %.2f",
+             (double)_att_sp.yaw_body, (double)_gnd_pos_ctrl_status.wp_dist, (double)_att_sp.thrust);*/
 
     struct crosstrack_error_s crosstrackErrorS;
     local_y_compensation(&crosstrackErrorS, current_position(0), current_position(1), _pos_sp_copy.previous.lat, _pos_sp_copy.previous.lon,
@@ -484,7 +464,7 @@ void GroundRoverPositionControl::control_mission(const matrix::Vector2f &current
                                                  const matrix::Vector3f &ground_speed,
                                                  const position_setpoint_triplet_s &pos_sp_triplet,
                                                  const float mission_throttle) {
-    PX4_INFO("mission control");
+//    PX4_INFO("mission control");
     /* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
     matrix::Vector2f curr_wp;
     curr_wp(0) = _pos_sp_copy.current.lat;
@@ -507,10 +487,10 @@ void GroundRoverPositionControl::control_mission(const matrix::Vector2f &current
 
 void GroundRoverPositionControl::local_y_compensation(struct crosstrack_error_s *crosstrack_error, double lat_now, double lon_now,
                                                       double lat_start, double lon_start, double lat_end, double lon_end) {
-    PX4_INFO("pre lat = %.6f, pre lon = %.6f, cur lat = %.6f, cur lon = %.6f, lat_end = %.6f, lon_end = %.6f",
-            lat_start, lon_start, lat_now, lon_now, lat_end, lon_end);
+/*    PX4_INFO("pre lat = %.6f, pre lon = %.6f, cur lat = %.6f, cur lon = %.6f, lat_end = %.6f, lon_end = %.6f",
+            lat_start, lon_start, lat_now, lon_now, lat_end, lon_end);*/
     if (!get_distance_to_line(crosstrack_error, lat_now, lon_now, lat_start, lon_start, lat_end, lon_end)) {
-        PX4_INFO("cross tarck err = %.2f", (double)crosstrack_error->distance);
+//        PX4_INFO("cross tarck err = %.2f", (double)crosstrack_error->distance);
     }
 
     float dt = 0.01;
@@ -758,9 +738,9 @@ GroundRoverPositionControl::task_main()
 			 * Attempt to control position, on success (= sensors present and not in manual mode),
 			 * publish setpoint.
 			 */
-/*						PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
+						PX4_INFO("_pos_sp_triplet.current.x = %.2f, _pos_sp_triplet.current.lat = %.6f, vx = %.2f",
 							 (double)_pos_sp_triplet.current.x,
-							 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);*/
+							 (double)_pos_sp_triplet.current.lat, (double)_pos_sp_triplet.current.vx);
 
 			if (control_position(current_position, ground_speed, _pos_sp_triplet)) {
 				_att_sp.timestamp = hrt_absolute_time();
@@ -807,6 +787,7 @@ GroundRoverPositionControl::task_main()
 					_gnd_pos_ctrl_status.wp_dist = get_distance_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 								       curr_wp(1));
 
+                    PX4_INFO("curr_wp = (%.2f, %.2f) ", (double) curr_wp(0), (double)curr_wp(1));
 					// TODO add y distance to yaw control.
 					_nav_bearing = get_bearing_to_next_waypoint(current_position(0), current_position(1), curr_wp(0),
 							curr_wp(1));
@@ -950,26 +931,25 @@ float GroundRoverPositionControl::wrap_pi(float bearing)
 }
 
 
-void GroundRoverPositionControl::check_achieved(const position_setpoint_triplet_s &pos_sp_triplet, float mission_throttle) {
+void GroundRoverPositionControl::check_achieved() {
     //			TODO if fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.523 //30度
 
-    Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
+/*    Eulerf euler_angles(matrix::Quatf(_sub_attitude.get().q));
     if (!_achieved
         && PX4_ISFINITE(pos_sp_triplet.current.yaw)
         && fabsf(euler_angles.psi() - _att_sp.yaw_body) < 0.08f) { // 5 degree
-        _att_sp.thrust = mission_throttle;
-
-        _gnd_pos_dist_pre = _gnd_pos_ctrl_status.wp_dist;
 
     } else {
-        _att_sp.thrust = 0.1f;
-    }
 
-    if (_gnd_pos_ctrl_status.wp_dist < _parameters.acc_rad && pos_sp_triplet.current.valid) {
+    }*/
+
+    float local_x_err = _pos_sp_triplet.current.x - _local_pos.x;
+    float local_y_err = _pos_sp_triplet.current.y - _local_pos.y;
+    float local_pos_err = sqrt(local_x_err * local_x_err + local_y_err * local_y_err);
+    if (local_pos_err < _parameters.acc_rad ) {
         _att_sp.thrust = 0.0f;
-        _achieved = true;
-
-    } else {
-        _achieved = false;
+        _att_sp.yaw_body = 0.0f;
     }
+    PX4_INFO("_att_sp.yaw_body = %.2f, local_pos_err = %.2f, _att_sp.thrust = %.2f",
+             (double)_att_sp.yaw_body, (double)local_pos_err, (double)_att_sp.thrust);
 }
